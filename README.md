@@ -36,9 +36,9 @@ cd podcast_audio2markdown
 ## Usage
 
 ### 1. Running the Script
-Run the script using:
+Run the script using (src folder):
 ```bash
-python your_script_name.py
+python main_whisper.py
 ```
 
 ### 2. Input Parameters
