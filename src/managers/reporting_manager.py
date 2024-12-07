@@ -11,7 +11,7 @@ class ReportingManager:
     def __init__(self, config):
         self.config = config
         self.nlp = self.config.nlp 
-        self.logger = self.config.logger  # Use the logger from config
+        self.logger = self.config.general['logger']  # Use the logger from config
 
     def report(self, transcription, word_timestamps, audio_file_name):
         # Log the report generation start

@@ -15,7 +15,6 @@ import torch
 class AudioManager:
     def __init__(self, config):
         self.config = config
-        self.model = self.load_model(config.model_config['model_name'])
         self.audio, self.sample_rate = None, None
 
     def load_and_preprocess_audio(self, file_path, target_sample_rate=16000):

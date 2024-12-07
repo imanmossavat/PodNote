@@ -26,11 +26,12 @@ class UIManager:
         self.state_manager.subscribe(self)
 
         # Access logger from config
-        self.logger = self.config.logger
+        self.logger = self.config.general['logger']
 
     def update_config(self, new_config):
         """React to updated configuration from the StateManager."""
         self.config = new_config
+        self.logger = self.config.general['logger']
         self.logger.info("UI updated with new configuration.")
 
     def process_audio(self, audio_file):

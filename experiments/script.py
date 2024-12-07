@@ -39,8 +39,8 @@ def main():
     ui_manager = UIManager(config, state_manager)
 
     # Step 4: Simulate loading the audio file from the user's input
-    audio_file = "path_to_audio_file.wav"  # Update this path as needed
-
+    audio_file = r"C:\Users\imanm\OneDrive\Documents\podcast\new_transcipt_code\MD_transcriptor\data\test\promo_.wav"
+    
     # Log the audio file processing start
     logger.info(f"Loading and processing the audio file: {audio_file}")
 
