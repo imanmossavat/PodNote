@@ -82,20 +82,37 @@ class Config:
                  job_name="Job",
                  timestamp_format="%Y%m%d-%H%M%S",
                 ):
+        
+        object.__setattr__(self, '_initialized', False)  # We set it directly to avoid triggering __setattr__
+
         self.state_manager = None  # To be filled by state manager
         
         # Store timestamp and job_name in a dictionary (instead of directly as attributes)
-        self.id = {
+        self.general = {
             'timestamp': time.strftime(timestamp_format),
-            'job_name': job_name
+            'job_name': job_name,
+            'logger': None
         }        
         if data_dir is None:
-            data_dir = os.path.join(root_dir, 'data', f"{job_name}_{self.timestamp}")
+            data_dir = os.path.join(root_dir, 'data', f"{job_name}_{self.general['timestamp']}")
         
-        self.logger = self._create_default_logger()
+        
+        self.directories = {
+            'root': root_dir,
+            'data_dir': data_dir,
+            'audio_dir': os.path.join(data_dir, "audio"),
+            'report_dir': os.path.join(data_dir, "reports"),
+            'log_dir': os.path.join(data_dir, "logs"),
+            'pkl_dir': os.path.join(data_dir, "pkl")
+        }
+
+        self._create_directories()
+
+        
+        self.general['logger'] = self._create_default_logger()
         
         if model_name not in self.whisper_models:
-            self.logger.info(f"Model '{model_name}' not found. Using default 'tiny.en'.")
+            self.general['logger'].info(f"Model '{model_name}' not found. Using default 'tiny.en'.")
             model_name = "tiny.en"
         
         # Configuration dictionaries
@@ -106,14 +123,7 @@ class Config:
         self.reporting_config = {
             'report_interval': report_interval
         }
-        self.directories = {
-            'root': root_dir,
-            'data_dir': data_dir,
-            'audio_dir': os.path.join(data_dir, "audio"),
-            'report_dir': os.path.join(data_dir, "reports"),
-            'log_dir': os.path.join(data_dir, "logs"),
-            'pkl_dir': os.path.join(data_dir, "pkl")
-        }
+        
         self.prompt = {
             'filler': "I'm like, you know what I mean, kind of, um, ah, huh, and so, so um, uh, and um, like um, so like, like it's, it's like, i mean, yeah, ok so, uh so, so uh, yeah so, you know, it's uh, uh and, and uh, like, kind", 
             'domain': ""
@@ -127,21 +137,28 @@ class Config:
 
                     
         
-        self._create_directories()
+
+        object.__setattr__(self, '_initialized', True)  # We set it directly to avoid triggering __setattr__
+
 
     def get_full_prompt(self):
         return self.prompt['filler'] + self.prompt['domain']
 
     def __setattr__(self, name, value):
         """Override attribute assignment to route through set_config_value."""
-        # If the name matches one of the configuration dictionaries, route through set_config_value
-        if name == 'state_manager':  # Skip setting state_manager to avoid recursive notifying
-            super().__setattr__(name, value)  # Set the value normally for state_manager
-        elif name in self.__dict__:  # Don't interfere with existing attributes (like __dict__)
-            super().__setattr__(name, value)  # Set the value normally for non-dynamic attributes
+        # Check if object has been fully initialized
+        if not hasattr(self, '_initialized') or not self._initialized:
+            # during initialization Skip custom logic during initialization
+            super().__setattr__(name, value)
         else:
-            self.set_config_value(name, value)  # For any unknown field, use the set_config_value method
-
+            # Custom handling after initialization
+            if name in ['state_manager']:
+                if isinstance(value, dict) and name in self.__dict__:
+                    self.set_config_value(name, value)
+                else:
+                    super().__setattr__(name, value)
+            else:
+                self.set_config_value(name, value)
 
     def set_config_value(self, key, value):
         """Sets a value in the config using a dot-separated key to navigate nested dictionaries."""
@@ -161,7 +178,8 @@ class Config:
         config_dict[final_key] = value
         
         # Notify the state manager about the change
-        self._notify_state_manager()
+        if self.state_manager is not None: # state manager is off when initialization or on stand alone use of config, otherwise, it should be on
+            self.state_manager.update_config(self)
 
     def _notify_state_manager(self):
         """Notify the StateManager about changes to the config."""
@@ -186,3 +204,4 @@ class Config:
 
         logger.setLevel(logging.INFO)
         return logger
+
