@@ -80,6 +80,7 @@ class Config:
                  root_dir=root_dir, 
                  data_dir=None,
                  job_name=None,
+                 target_sample_rate= 16000,
                  timestamp_format="%Y%m%d-%H%M%S",
                 ):
         
@@ -93,7 +94,8 @@ class Config:
             'job_name': job_name,
             'logger': None,
             'device': 'cpu',
-            'audio_file': None 
+            'audio_file': None,
+            'target_sample_rate': target_sample_rate 
         }        
         if data_dir is None:
             data_dir = os.path.join(root_dir, 'data', f"{job_name}_{self.general['timestamp']}")
@@ -131,7 +133,7 @@ class Config:
         }
         
 
-        self.nlp = {'spacy': spacy.load("en_core_web_sm"),
+        self.nlp = {'spacy_model': spacy.load("en_core_web_sm"),
                     'user_highlight_keywords': [],
                     'filler_words_removed': ["um", "uh", "like"]
         }

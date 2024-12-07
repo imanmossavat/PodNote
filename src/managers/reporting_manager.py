@@ -8,10 +8,15 @@ from collections import Counter
 
 
 class ReportingManager:
-    def __init__(self, config):
-        self.config = config
-        self.nlp = self.config.nlp 
-        self.logger = self.config.general['logger']  # Use the logger from config
+    def __init__(self, 
+                 logger, 
+                 spacy_model, user_highlight_keywords, 
+                 filler_words_removed):
+
+        self.spacy_model = spacy_model
+        self.user_highlight_keywords= user_highlight_keywords
+        self.filler_words_removed= filler_words_removed
+        self.logger = logger  # Use the logger from config
 
     def report(self, transcription, word_timestamps, audio_file_name=None):
         # Log the report generation start
@@ -39,7 +44,7 @@ class ReportingManager:
         self.save_markdown(chunks, audio_file_name, timestamp= timestamp)
 
     def extract_keywords(self, transcript, top_m=10):
-        doc = self.nlp(transcript)
+        doc = self.spacy_model(transcript)
         stop_words = set(["hello", "hi", "um", "uh", "like", "okay", "well", 'today', "thing", "things", "kind"])
         keywords = [token.text for token in doc if token.pos_ in ['NOUN', 'PROPN'] and token.text.lower() not in stop_words]
         keyword_counts = Counter(keywords)
@@ -49,7 +54,7 @@ class ReportingManager:
         return updated_transcript, [kw[0] for kw in top_keywords]
 
     def highlight_keywords(self, transcript):
-        user_keywords = self.config.nlp.user_highlight_keywords
+        user_keywords = self.user_highlight_keywords
         for keyword in user_keywords:
             transcript = re.sub(f"({keyword})", r"**\1**", transcript, flags=re.IGNORECASE)
         return transcript
@@ -64,7 +69,7 @@ class ReportingManager:
         return str(timedelta(seconds=seconds))[:8]
 
     def format_filler_text(self, text):
-        filler_words = self.config.nlp.filler_words_removed
+        filler_words = self.filler_words_removed
         for word in filler_words:
             text = text.replace(f" {word} ", f" <span style='color: red;'>{word}</span> ")
         return text
@@ -113,7 +118,7 @@ class ReportingManager:
             - The end time of the chunk.
         """
         # Create a spacy document to perform sentence boundary detection
-        doc = self.nlp(" ".join([segment['text'] for segment in word_timestamps]))
+        doc = self.spacy_model(" ".join([segment['text'] for segment in word_timestamps]))
         chunks = []
         current_chunk = ""
         current_start_time = word_timestamps[0]['start']

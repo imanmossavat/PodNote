@@ -6,9 +6,30 @@ import os
 class ProcessingService:
     def __init__(self, config):
         self.config= config
-        self.audio_manager = AudioManager(config)
-        self.transcription_manager = TranscriptionManager(config)
-        self.reporting_manager = ReportingManager(config)
+        
+        target_sample_rate = config.general['target_sample_rate']
+        logger= config.general['logger']
+        device= config.general['device']
+        transcription_model_name= config.model_config['transcription_model_name']
+
+
+        spacy_model= config.nlp['spacy_model']
+        user_highlight_keywords= config.nlp['user_highlight_keywords']
+        filler_words_removed=config.nlp['filler_words_removed']
+
+        self.audio_manager = AudioManager(logger= logger, target_sample_rate= target_sample_rate)
+        
+        
+
+        self.transcription_manager = TranscriptionManager(logger= logger,
+                                                          transcription_model_name= transcription_model_name,
+                                                          device= device
+                                                          )
+
+        self.reporting_manager = ReportingManager(logger= logger,
+                                                  spacy_model= spacy_model,
+                                                  user_highlight_keywords= user_highlight_keywords,
+                                                  filler_words_removed=filler_words_removed)
 
     def process_audio(self, audio_file):
         self.audio_manager.load_and_preprocess_audio(audio_file)

@@ -13,21 +13,22 @@ import os
 import torch
 
 class AudioManager:
-    def __init__(self, config):
-        self.config = config
+    def __init__(self, logger, target_sample_rate=16000):
+        self.logger = logger
+        self.target_sample_rate= target_sample_rate
         self.audio, self.sample_rate = None, None
 
-    def load_and_preprocess_audio(self, file_path, target_sample_rate=16000):
+    def load_and_preprocess_audio(self, file_path):
         """Loads and preprocesses the audio file."""
         waveform, sample_rate = torchaudio.load(file_path)
         
-        if sample_rate != target_sample_rate:
-            waveform = torchaudio.transforms.Resample(sample_rate, target_sample_rate)(waveform)
+        if sample_rate != self.target_sample_rate:
+            waveform = torchaudio.transforms.Resample(sample_rate, self.target_sample_rate)(waveform)
         
         if waveform.size(0) > 1:
             waveform = torch.mean(waveform, dim=0, keepdim=True)
         
-        self.audio, self.sample_rate = waveform, target_sample_rate
+        self.audio, self.sample_rate = waveform, self.target_sample_rate
 
     def segment_audio(self, audio, timestamps):
         """Segments the audio according to the timestamps."""
@@ -42,4 +43,4 @@ class AudioManager:
     def save_segment(self, segment, index, output_folder):
         # Save audio segment to file
         file_path = os.path.join(output_folder, f"segment_{index}.wav")
-        torchaudio.save(file_path, segment, self.config.audio_sample_rate)
+        torchaudio.save(file_path, segment, self.sample_rate)
