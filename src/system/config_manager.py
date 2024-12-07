@@ -79,7 +79,7 @@ class Config:
                  report_interval=10, 
                  root_dir=root_dir, 
                  data_dir=None,
-                 job_name="Job",
+                 job_name=None,
                  timestamp_format="%Y%m%d-%H%M%S",
                 ):
         
@@ -92,7 +92,8 @@ class Config:
             'timestamp': time.strftime(timestamp_format),
             'job_name': job_name,
             'logger': None,
-            'device': 'cpu'
+            'device': 'cpu',
+            'audio_file': None 
         }        
         if data_dir is None:
             data_dir = os.path.join(root_dir, 'data', f"{job_name}_{self.general['timestamp']}")
@@ -101,7 +102,6 @@ class Config:
         self.directories = {
             'root': root_dir,
             'data_dir': data_dir,
-            'audio_dir': os.path.join(data_dir, "audio"),
             'report_dir': os.path.join(data_dir, "reports"),
             'log_dir': os.path.join(data_dir, "logs"),
             'pkl_dir': os.path.join(data_dir, "pkl")
@@ -158,6 +158,8 @@ class Config:
                     self.set_config_value(name, value)
                 else:
                     super().__setattr__(name, value)
+            elif name == "general.audio_file":
+                self.update_audio_config(audio_file_path= value)
             else:
                 self.set_config_value(name, value)
 
@@ -180,7 +182,9 @@ class Config:
         
         # Notify the state manager about the change
         if self.state_manager is not None: # state manager is off when initialization or on stand alone use of config, otherwise, it should be on
-            self.state_manager.update_config(self)
+            self._notify_state_manager(self)
+
+        
 
     def _notify_state_manager(self):
         """Notify the StateManager about changes to the config."""
@@ -206,3 +210,23 @@ class Config:
         logger.setLevel(logging.INFO)
         return logger
 
+    def update_audio_file(self, audio_file_path):
+        """Update configuration based on the new audio file: audio_file."""
+        if not audio_file_path:
+            raise ValueError("Audio file path cannot be empty.")
+
+        if not os.path.exists(audio_file_path):
+            raise FileNotFoundError(f"Audio file not found: {audio_file_path}")
+
+        # Extract details from the audio file
+        audio_file_name = os.path.splitext(os.path.basename(audio_file_path))[0]
+        self.general['audio_file'] = audio_file_path
+
+        # Update directories based on the new audio file
+        self.directories['report_dir'] = os.path.join(self.directories['report_dir'], f"audio_{audio_file_name}")
+
+
+        self._create_directories()
+        if self.state_manager is not None: # state manager is off when initialization or on stand alone use of config, otherwise, it should be on
+            self._notify_state_manager(self)
+        self.general['logger'].info(f"Configuration updated for audio file: {audio_file_path}")

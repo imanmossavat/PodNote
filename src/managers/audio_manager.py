@@ -27,7 +27,7 @@ class AudioManager:
         if waveform.size(0) > 1:
             waveform = torch.mean(waveform, dim=0, keepdim=True)
         
-        return waveform, target_sample_rate
+        self.audio, self.sample_rate = waveform, target_sample_rate
 
     def segment_audio(self, audio, timestamps):
         """Segments the audio according to the timestamps."""

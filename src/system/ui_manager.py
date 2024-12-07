@@ -34,7 +34,12 @@ class UIManager:
         self.logger = self.config.general['logger']
         self.logger.info("UI updated with new configuration.")
 
-    def process_audio(self, audio_file):
+    def change_audio_file_name(self,audio_file):
+        self.config.general['audio_file'] = audio_file
+
+    def process_audio(self):
+        audio_file= self.config.general['audio_file']
+
         try:
             self.processing_service.process_audio(audio_file)
             self.logger.info("Audio processed successfully.")

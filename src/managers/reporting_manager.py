@@ -13,7 +13,7 @@ class ReportingManager:
         self.nlp = self.config.nlp 
         self.logger = self.config.general['logger']  # Use the logger from config
 
-    def report(self, transcription, word_timestamps, audio_file_name):
+    def report(self, transcription, word_timestamps, audio_file_name=None):
         # Log the report generation start
         self.logger.info("Generating report for audio file: %s", audio_file_name)
 

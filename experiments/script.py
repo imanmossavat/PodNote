@@ -40,13 +40,14 @@ def main():
 
     # Step 4: Simulate loading the audio file from the user's input
     audio_file = r"C:\Users\imanm\OneDrive\Documents\podcast\new_transcipt_code\MD_transcriptor\data\test\promo_.wav"
-    
+    ui_manager.change_audio_file_name(audio_file)
+
     # Log the audio file processing start
     logger.info(f"Loading and processing the audio file: {audio_file}")
 
     try:
         # Step 5: Process the audio through the UI manager
-        ui_manager.process_audio(audio_file)
+        ui_manager.process_audio()
         ui_manager.transcribe()
         ui_manager.report()
 
