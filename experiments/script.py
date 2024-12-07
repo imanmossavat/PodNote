@@ -47,6 +47,9 @@ def main():
     try:
         # Step 5: Process the audio through the UI manager
         ui_manager.process_audio(audio_file)
+        ui_manager.transcribe()
+        ui_manager.report()
+
 
         # Step 6: Log the successful processing and report generation
         logger.info(f"Audio file '{audio_file}' has been processed successfully.")

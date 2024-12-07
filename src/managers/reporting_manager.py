@@ -35,7 +35,8 @@ class ReportingManager:
         chunks = self.split_text_into_chunks(word_timestamps)
 
         # Save the markdown file
-        self.save_markdown(chunks, audio_file_name)
+        timestamp= self.config.general['timestamp']
+        self.save_markdown(chunks, audio_file_name, timestamp= timestamp)
 
     def extract_keywords(self, transcript, top_m=10):
         doc = self.nlp(transcript)
@@ -68,12 +69,13 @@ class ReportingManager:
             text = text.replace(f" {word} ", f" <span style='color: red;'>{word}</span> ")
         return text
 
-    def save_markdown(self, chunks, audio_file_name):
+    def save_markdown(self, chunks, audio_file_name, timestamp=None):
         # Define the report directory from the config
         report_dir = self.config.directories['report_dir']
         os.makedirs(report_dir, exist_ok=True)  # Ensure the directory exists
 
-        timestamp = int(time.time())
+        if timestamp is None:
+            timestamp = int(time.time())
         md_filename = os.path.join(report_dir, f"{os.path.splitext(audio_file_name)[0]}_{timestamp}.md")
 
         try:

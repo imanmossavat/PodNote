@@ -91,7 +91,8 @@ class Config:
         self.general = {
             'timestamp': time.strftime(timestamp_format),
             'job_name': job_name,
-            'logger': None
+            'logger': None,
+            'device': 'cpu'
         }        
         if data_dir is None:
             data_dir = os.path.join(root_dir, 'data', f"{job_name}_{self.general['timestamp']}")
@@ -117,7 +118,7 @@ class Config:
         
         # Configuration dictionaries
         self.model_config = {
-            'model_name': model_name,
+            'transcription_model_name': model_name,
             'chunk_size': chunk_size
         }
         self.reporting_config = {
