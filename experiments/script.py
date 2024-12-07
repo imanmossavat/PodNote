@@ -25,12 +25,8 @@ def main():
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
-    config.logger = logger
+    config.general['logger'] = logger
 
-    # Set directories in config for reports
-    config.directories = {
-        'report_dir': os.path.join(os.getcwd(), 'reports')
-    }
 
     # Ensure the report directory exists
     if not os.path.exists(config.directories['report_dir']):
