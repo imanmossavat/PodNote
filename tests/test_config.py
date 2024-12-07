@@ -5,7 +5,7 @@ print(root_dir)
 sys.path.append(root_dir)
 
 import unittest
-from src.config.config import Config
+from src.system.config_manager import Config
 
 class TestConfig(unittest.TestCase):
 

@@ -5,12 +5,10 @@ import sys
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
 print(root_dir)
 sys.path.append(root_dir)
-from system import Config  # Import Config class
 
 
 
 import torchaudio
-import whisper
 import os
 import torch
 
