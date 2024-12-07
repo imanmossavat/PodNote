@@ -10,11 +10,10 @@ class ProcessingService:
 
     def process_audio(self, audio_file):
         self.audio_manager.load_and_preprocess_audio(audio_file)
-        chunks = self.split_text_into_chunks(word_timestamps)
-        self.reporting_manager.save_markdown(chunks, audio_file)
-        return chunks
+
     
-    def transcribe(self, prompt):
+    def transcribe(self):
+
         self.transcription_manager.transcribe_audio(self.audio_manager.audio)
     
     def report(self):

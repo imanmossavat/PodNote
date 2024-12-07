@@ -4,7 +4,7 @@ from datetime import timedelta
 import time
 import re
 from collections import Counter
-import spacy
+#import spacy
 
 
 class ReportingManager:
@@ -48,7 +48,7 @@ class ReportingManager:
         return updated_transcript, [kw[0] for kw in top_keywords]
 
     def highlight_keywords(self, transcript):
-        user_keywords = self.config.user_highlight_keywords
+        user_keywords = self.config.nlp.user_highlight_keywords
         for keyword in user_keywords:
             transcript = re.sub(f"({keyword})", r"**\1**", transcript, flags=re.IGNORECASE)
         return transcript
@@ -63,7 +63,7 @@ class ReportingManager:
         return str(timedelta(seconds=seconds))[:8]
 
     def format_filler_text(self, text):
-        filler_words = self.config.filler_words_removed
+        filler_words = self.config.nlp.filler_words_removed
         for word in filler_words:
             text = text.replace(f" {word} ", f" <span style='color: red;'>{word}</span> ")
         return text
