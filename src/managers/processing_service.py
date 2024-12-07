@@ -1,6 +1,7 @@
 from .audio_manager import AudioManager
 from .reporting_manager import ReportingManager
 from .transcription_manager import TranscriptionManager
+import os
 
 class ProcessingService:
     def __init__(self, config):
@@ -27,8 +28,13 @@ class ProcessingService:
         elif  self.transcription_manager.word_timestamps is None:
             self.config.general['logger'].info(f'no timestampes available to report, first transcribe')
         else:
+            
+            audio_file_path= self.config.general['audio_file']
+            audio_file_name = os.path.splitext(os.path.basename(audio_file_path))[0]
+
             self.reporting_manager.report(
-             self.transcription_manager.transcription,
-             self.transcription_manager.word_timestamps,
+            transcription= self.transcription_manager.transcription,
+            word_timestamps= self.transcription_manager.word_timestamps,
+            audio_file_name= audio_file_name
              )
 

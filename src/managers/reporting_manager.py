@@ -35,7 +35,7 @@ class ReportingManager:
         chunks = self.split_text_into_chunks(word_timestamps)
 
         # Save the markdown file
-        timestamp= self.config.general['timestamp']
+        timestamp=  int(time.time()) # every report has its own timestamp!
         self.save_markdown(chunks, audio_file_name, timestamp= timestamp)
 
     def extract_keywords(self, transcript, top_m=10):
