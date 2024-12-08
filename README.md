@@ -21,14 +21,10 @@ Before running the script, install the required Python libraries:
    ```bash
    pip install torchaudio torch spacy whisper
    ```
-
-## Installation
-
-If you have the `requirements.txt` file in the repo, you can install dependencies in one step:
-
-```bash
-pip install -r requirements.txt
-```
+   or 
+   ```bash
+   pip install -r requirements.txt
+   ```
 
 ## Usage
 
