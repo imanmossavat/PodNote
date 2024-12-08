@@ -17,13 +17,12 @@ class UIManager:
         state_manager (StateManager): Manages application state and subscriptions.
         processing_service (ProcessingService): Handles processing tasks.
     """
-    def __init__(self, config, state_manager):
+    def __init__(self, config):
         self.config = config
-        self.state_manager = state_manager
         self.processing_service = ProcessingService(config)
 
         # Subscribe to state updates
-        self.state_manager.subscribe(self)
+        self.config.state_manager.subscribe(self)
 
         # Access logger from config
         self.logger = self.config.general['logger']
@@ -35,7 +34,7 @@ class UIManager:
         self.logger.info("UI updated with new configuration.")
 
     def change_audio_file_name(self,audio_file):
-        self.config.general['audio_file'] = audio_file
+        self.config.set_config_value('general.audio_file', audio_file)
 
     def process_audio(self):
         audio_file= self.config.general['audio_file']
@@ -50,7 +49,7 @@ class UIManager:
     def transcribe(self, prompt=None):
         
         if prompt is not None:
-            self.state_manager.update_config(prompt=prompt)
+            self.config.state_manager.update_config(prompt=prompt)
             self.logger.info(f"Changing config prompt by ui-manager transcribe")
 
 

@@ -33,10 +33,10 @@ def main():
         os.makedirs(config.directories['report_dir'])
 
     # Step 2: Initialize the State Manager (tracking application state)
-    state_manager = StateManager(config)
+    StateManager(config)
 
     # Step 3: Initialize the UI Manager (handling user requests and managing interactions)
-    ui_manager = UIManager(config, state_manager)
+    ui_manager = UIManager(config)
 
     # Step 4: Simulate loading the audio file from the user's input
     audio_file = r"C:\Users\imanm\OneDrive\Documents\podcast\new_transcipt_code\MD_transcriptor\data\test\promo_.wav"

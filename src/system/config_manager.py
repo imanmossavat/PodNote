@@ -1,4 +1,10 @@
 """
+
+when setting config use: config.set_config_value
+
+for example, when setting the audio_file name say: config.set_config_value('general.audio_file', audio_file)
+
+
 Config Management System
 
 This module defines the `Config` class, which is responsible for managing the configuration of the application.
@@ -149,6 +155,11 @@ class Config:
 
     def __setattr__(self, name, value):
         """Override attribute assignment to route through set_config_value."""
+        if hasattr(self, '_initialized') and self._initialized:
+            self.general['logger'].info(f'setting config attributes for {name} to {value}')
+        elif hasattr(self, 'general') and self.general['logger'] is not None:
+            self.general['logger'].info(f'initializing config attributes for {name} to {value}')
+
         # Check if object has been fully initialized
         if not hasattr(self, '_initialized') or not self._initialized:
             # during initialization Skip custom logic during initialization
@@ -184,7 +195,7 @@ class Config:
         
         # Notify the state manager about the change
         if self.state_manager is not None: # state manager is off when initialization or on stand alone use of config, otherwise, it should be on
-            self._notify_state_manager(self)
+            self._notify_state_manager()
 
         
 

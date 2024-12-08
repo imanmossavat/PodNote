@@ -9,22 +9,23 @@ sys.path.append(root_dir)
 import whisper
 
 class TranscriptionManager:
-    def __init__(self, logger, transcription_model_name, device):
-        self.logger = logger,
-        self.transcription_model_name= transcription_model_name,
-        self.device= device,
+    def __init__(self, logger, transcription_model_name, device, prompt=None):
+        self.logger = logger
+        self.transcription_model_name= transcription_model_name
+        self.device= device
         self.model= None
         self.logger.info(f'transcription model init {self.model}')
         self.transcription = None
         self.word_timestamps = None
+        self.prompt= prompt
         
-    def load_model(self, model_name, device="cpu"):
+    def load_model(self):
         """Loads the Whisper model."""
-        self.model = whisper.load_model(model_name, device=device)
+        self.model = whisper.load_model(name= self.transcription_model_name,device= self.device)
         if self.model is None:
             self.logger.info(f'transcription model failed to load')
         else:
-            self.logger.info(f'transcription model {self.model} loaded in device: {device}')
+            self.logger.info(f'transcription model {self.model} loaded in device: {self.device}')
 
 
     
@@ -32,11 +33,10 @@ class TranscriptionManager:
         """Transcribes audio using the Whisper model."""
         
         if self.model is None:
-            self.load_model(
-                model_name= self.transcription_model_name,device= self.device)
+            self.load_model()
 
         if prompt is None:
-            prompt = self.config.get_full_prompt()
+            prompt = self.prompt
 
         
         result = self.model.transcribe(
