@@ -1,30 +1,31 @@
 import os
 import sys
+import argparse
 
+# Set up the root directory
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
-print(root_dir)
 sys.path.append(root_dir)
 
 from src import Config, UIManager
 
-import os
-
-
-
 def main():
-    # Step 1: Set up the configuration (Config) for the system
+    # Step 1: Set up command-line argument parsing for the audio file
+    parser = argparse.ArgumentParser(description="Transcribe a podcast audio file to markdown.")
+    parser.add_argument('audio_file', type=str, help="Path to the audio file to transcribe.")
+    args = parser.parse_args()
+
+    # Step 2: Set up the configuration (Config) for the system
     config = Config()
-
-
 
     # Step 3: Initialize the UI Manager (handling user requests and managing interactions)
     ui_manager = UIManager(config)
 
-    # Step 4: Simulate loading the audio file from the user's input
-    audio_file = r"C:\Users\imanm\OneDrive\Documents\podcast\new_transcipt_code\MD_transcriptor\data\test\promo_.wav"
+    # Step 4: Set the audio file from the command-line argument
+    audio_file = args.audio_file
     ui_manager.change_audio_file_name(audio_file)
 
     # Log the audio file processing start
+    print(f"Processing audio file: {audio_file}")
 
     try:
         # Step 5: Process the audio through the UI manager
@@ -32,14 +33,13 @@ def main():
         ui_manager.transcribe()
         ui_manager.report()
 
-
         # Step 6: Log the successful processing and report generation
+        print(f"Successfully processed and transcribed {audio_file}.")
     
     except Exception as e:
         # Log any errors that occur during the process
+        print(f"Error processing the audio file: {e}")
         raise
 
 if __name__ == "__main__":
     main()
-
-
