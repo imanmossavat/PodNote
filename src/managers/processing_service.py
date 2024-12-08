@@ -7,13 +7,13 @@ import spacy
 class ProcessingService:
     def __init__(self, config):
 
-
-        config.state_manager.subscribe(self)
         
         self.target_sample_rate = config.general['target_sample_rate']
         self.logger= config.general['logger']
         self.device= config.general['device']
         self.audio_file = config.general['audio_file']
+
+        self.report_dir = config.directories['report_dir']
 
         self.transcription_model_name= config.model_config['transcription_model_name']
 
@@ -38,9 +38,11 @@ class ProcessingService:
         self.reporting_manager = ReportingManager(logger= self.logger,
                                                   spacy_model= self.spacy_model,
                                                   user_highlight_keywords= self.user_highlight_keywords,
-                                                  filler_words_removed= self.filler_words_removed)
+                                                  filler_words_removed= self.filler_words_removed,
+                                                  report_dir= self.report_dir)
 
     def update_config(self, config):
+        self.report_dir = config.directories['report_dir']
         self.target_sample_rate = config.general['target_sample_rate']
         self.logger= config.general['logger']
         self.device= config.general['device']
@@ -66,6 +68,7 @@ class ProcessingService:
         self.reporting_manager.spacy_model= self.spacy_model
         self.reporting_manager.user_highlight_keywords= self.user_highlight_keywords
         self.reporting_manager.filler_words_removed= self.filler_words_removed
+        self.reporting_manager.report_dir= self.report_dir
                                                 
 
     def process_audio(self, audio_file):

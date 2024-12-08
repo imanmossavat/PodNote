@@ -11,12 +11,13 @@ class ReportingManager:
     def __init__(self, 
                  logger, 
                  spacy_model, user_highlight_keywords, 
-                 filler_words_removed):
+                 filler_words_removed, report_dir= None):
 
         self.spacy_model = spacy_model
         self.user_highlight_keywords= user_highlight_keywords
         self.filler_words_removed= filler_words_removed
         self.logger = logger  # Use the logger from config
+        self.report_dir= report_dir
 
     def report(self, transcription, word_timestamps, audio_file_name=None):
         # Log the report generation start
@@ -27,7 +28,7 @@ class ReportingManager:
         self.logger.info(f"Top keywords: {keywords}")
 
         # Highlight keywords
-        highlighted_transcription = self.highlight_keywords(updated_transcription, keywords)
+        highlighted_transcription = self.highlight_keywords(updated_transcription)
 
         # Generate Table of Contents
         toc = self.generate_table_of_contents(highlighted_transcription)
@@ -76,7 +77,7 @@ class ReportingManager:
 
     def save_markdown(self, chunks, audio_file_name, timestamp=None):
         # Define the report directory from the config
-        report_dir = self.config.directories['report_dir']
+        report_dir = self.report_dir
         os.makedirs(report_dir, exist_ok=True)  # Ensure the directory exists
 
         if timestamp is None:

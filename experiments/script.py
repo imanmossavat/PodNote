@@ -5,9 +5,8 @@ root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
 print(root_dir)
 sys.path.append(root_dir)
 
-from src import Config, UIManager, StateManager
+from src import Config, UIManager
 
-import logging
 import os
 
 
@@ -16,24 +15,7 @@ def main():
     # Step 1: Set up the configuration (Config) for the system
     config = Config()
 
-    # Set up the logger (for logging information)
-    logger = logging.getLogger('AudioProcessingApp')
-    logger.setLevel(logging.DEBUG)
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
 
-    config.general['logger'] = logger
-
-
-    # Ensure the report directory exists
-    if not os.path.exists(config.directories['report_dir']):
-        os.makedirs(config.directories['report_dir'])
-
-    # Step 2: Initialize the State Manager (tracking application state)
-    StateManager(config)
 
     # Step 3: Initialize the UI Manager (handling user requests and managing interactions)
     ui_manager = UIManager(config)
@@ -43,7 +25,6 @@ def main():
     ui_manager.change_audio_file_name(audio_file)
 
     # Log the audio file processing start
-    logger.info(f"Loading and processing the audio file: {audio_file}")
 
     try:
         # Step 5: Process the audio through the UI manager
@@ -53,11 +34,9 @@ def main():
 
 
         # Step 6: Log the successful processing and report generation
-        logger.info(f"Audio file '{audio_file}' has been processed successfully.")
     
     except Exception as e:
         # Log any errors that occur during the process
-        logger.error(f"An error occurred while processing the audio file: {e}")
         raise
 
 if __name__ == "__main__":
