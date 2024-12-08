@@ -1,65 +1,51 @@
 """
-
-when setting config use: config.set_config_value
-
-for example, when setting the audio_file name say: config.set_config_value('general.audio_file', audio_file)
-
-
 Config Management System
 
-This module defines the `Config` class, which is responsible for managing the configuration of the application.
-The configuration is structured as a collection of nested dictionaries representing various aspects of the system,
-such as model settings, reporting parameters, directory paths, and prompts.
+The `Config` class manages the configuration for the application, providing:
+- Structured, nested configuration fields for models, directories, reporting, and more.
+- Methods for dynamic updates via `set_config_value` using dot-separated keys.
+- Automatic directory management and logging setup.
+- Integration with a `StateManager` to notify changes.
 
-The `Config` class provides the following features:
+Key Features:
+1. **Set Configuration Dynamically**:
+   Use `config.set_config_value` to set values dynamically. For example:
+config.set_config_value('general.audio_file', 'path/to/audio.mp3')
 
-1. **Dynamic Attribute Management**:
-   The configuration can be updated dynamically using attribute assignment, where nested fields in the configuration
-   can be accessed and modified using dot-separated keys (e.g., `config.model_config.model_name = 'new_model'`).
-   The `__setattr__` method overrides the default attribute assignment to route all updates through a central method
-   (`set_config_value`), which handles nested dictionary structures.
 
-2. **Automatic Notification of Configuration Changes**:
-   When the configuration is updated, the `Config` class notifies a `StateManager` (if it exists) about the change via
-   the `_notify_state_manager` method. This allows other components of the application that depend on the configuration
-   to react to the changes (e.g., updating models, restarting processes).
+2. **Automatic Directory Management**:
+Ensures required directories (e.g., data, logs, reports) are created if missing.
 
-3. **Handling Nested Dictionaries**:
-   The configuration contains multiple nested dictionaries (e.g., `model_config`, `reporting_config`, `directories`, etc.).
-   The `set_config_value` method allows for easy navigation and updating of deeply nested values using a dot-separated key.
-   For example, setting a new chunk size can be done via `config.model_config.chunk_size = 1024`.
+3. **Model Configuration**:
+Default model settings with validation for supported Whisper models.
 
-4. **Exemptions for Specific Attributes**:
-   Some attributes, such as `state_manager`, are not intended to trigger notifications upon being set. These attributes
-   are handled specially in the `__setattr__` method to ensure that assigning a new state manager or other similar attributes
-   does not inadvertently notify all subscribers or update components unnecessarily.
+4. **Logging**:
+Logs significant configuration changes and events, provided a logger is initialized.
 
-5. **Flexible Configuration Initialization**:
-   The `Config` class supports initialization with default values for various configuration options (e.g., model name,
-   chunk size, report interval, etc.). These defaults can be customized during instantiation, and certain directories
-   (e.g., logs, audio files, reports) are automatically created based on the provided or default paths.
+5. **State Management**:
+Automatically notifies the `StateManager` when configuration changes, ensuring consistent state.
 
-6. **Logging Setup**:
-   The `Config` class includes logging capabilities that capture significant events, errors, or configurations. The logger
-   is set up to handle both console and file-based logging, ensuring that important information about the configuration
-   and system state is available for troubleshooting.
+6. **NLP Utilities**:
+Loads a SpaCy model (`en_core_web_sm`) and allows customization of filler word processing.
 
-7. **Directory Management**:
-   Automatically manages the creation of required directories, ensuring that paths like `data_dir`, `audio_dir`, and
-   `log_dir` exist when needed, avoiding errors when reading or writing to files.
+Key Attributes:
+- `general`: Contains general configuration such as job name, timestamp, logger, and audio file.
+- `directories`: Manages paths for root, data, reports, logs, and pickles.
+- `model_config`: Manages model settings like `transcription_model_name` and `chunk_size`.
+- `reporting_config`: Defines reporting intervals.
+- `prompt`: Stores default and custom filler/domain-specific prompts.
+- `nlp`: Configuration for NLP processing.
 
-### Rationale:
+Key Methods:
+- `set_config_value(key, value)`: Sets configuration fields using dot-separated keys.
+- `update_audio_file(audio_file_path)`: Updates configuration and paths based on the given audio file.
 
-- **Dynamic Configuration**: The decision to use dot-separated keys for accessing nested configuration values allows for flexibility in managing and modifying configuration fields without tightly coupling the code to specific attributes. It simplifies updates and makes the configuration easier to extend.
+Notes:
+- A logger is created during initialization. Additional logging points can be added to ensure traceability of updates.
+- If `StateManager` is not set, changes will not be propagated outside the configuration.
 
-- **State Management**: By integrating the state manager with configuration changes, the system ensures that updates to the configuration are consistently tracked, versioned, and reflected across all components that rely on it. This architecture makes it easier to maintain consistency and to revert to previous configurations if necessary.
-
-- **Exemption of `state_manager`**: The `state_manager` attribute is an internal object responsible for managing the configuration's state and history. Since changing the `state_manager` does not affect the configuration directly, it is exempted from triggering notifications to prevent unnecessary updates or state tracking operations.
-
-- **Passing Config by Reference**: The `Config` object is passed by reference throughout the application, meaning that any updates made to the configuration object will be reflected across all components that reference it. This is a deliberate design choice because it allows the configuration to be centrally managed and ensures that changes to the configuration state are immediately visible to all components without needing to duplicate or copy the configuration. The `Config` object is intended to be mutable and shared, making reference passing the most efficient and effective way to propagate changes across the system.
-
-This design provides a robust, flexible, and extensible configuration management system that scales well as new features or settings are added to the application.
 """
+ 
 
 
 import logging
@@ -89,12 +75,9 @@ class Config:
                  target_sample_rate= 16000,
                  timestamp_format="%Y%m%d-%H%M%S",
                 ):
+                
+        self.state_manager = None  
         
-        object.__setattr__(self, '_initialized', False)  # We set it directly to avoid triggering __setattr__
-
-        self.state_manager = None  # To be filled by state manager
-        
-        # Store timestamp and job_name in a dictionary (instead of directly as attributes)
         self.general = {
             'timestamp': time.strftime(timestamp_format),
             'job_name': job_name,
@@ -121,10 +104,10 @@ class Config:
         self.general['logger'] = self._create_default_logger()
         
         if model_name not in self.whisper_models:
-            self.general['logger'].info(f"Model '{model_name}' not found. Using default 'tiny.en'.")
+            if 'logger' in self.general and self.general['logger']:
+                self.general['logger'].info(f"Model '{model_name}' not found. Using default 'tiny.en'.")
             model_name = "tiny.en"
         
-        # Configuration dictionaries
         self.model_config = {
             'transcription_model_name': model_name,
             'chunk_size': chunk_size
@@ -153,51 +136,26 @@ class Config:
     def get_full_prompt(self):
         return self.prompt['filler'] + self.prompt['domain']
 
-    def __setattr__(self, name, value):
-        """Override attribute assignment to route through set_config_value."""
-        if hasattr(self, '_initialized') and self._initialized:
-            self.general['logger'].info(f'setting config attributes for {name} to {value}')
-        elif hasattr(self, 'general') and self.general['logger'] is not None:
-            self.general['logger'].info(f'initializing config attributes for {name} to {value}')
-
-        # Check if object has been fully initialized
-        if not hasattr(self, '_initialized') or not self._initialized:
-            # during initialization Skip custom logic during initialization
-            super().__setattr__(name, value)
-        else:
-            # Custom handling after initialization
-            if name in ['state_manager']:
-                if isinstance(value, dict) and name in self.__dict__:
-                    self.set_config_value(name, value)
-                else:
-                    super().__setattr__(name, value)
-            elif name == "general.audio_file":
-                self.update_audio_config(audio_file_path= value)
-            else:
-                self.set_config_value(name, value)
-
     def set_config_value(self, key, value):
-        """Sets a value in the config using a dot-separated key to navigate nested dictionaries."""
-        keys = key.split('.')  # Split the key into individual parts for nested dictionaries
+        keys = key.split('.')
         config_dict = self.__dict__
 
-        # Navigate through the nested dictionaries based on the keys
-        for part in keys[:-1]:  # Traverse all but the last key
+        for part in keys[:-1]:
             if part not in config_dict:
                 raise KeyError(f"Key '{part}' not found in the configuration.")
-            config_dict = config_dict[part]  # Go deeper into the nested dictionary
+            config_dict = config_dict[part]
 
-        # Set the final value in the nested dictionary
         final_key = keys[-1]
         if final_key not in config_dict:
             raise KeyError(f"Key '{final_key}' not found in the configuration.")
         config_dict[final_key] = value
         
-        # Notify the state manager about the change
-        if self.state_manager is not None: # state manager is off when initialization or on stand alone use of config, otherwise, it should be on
-            self._notify_state_manager()
+        if 'logger' in self.general and self.general['logger']:
+            self.general['logger'].info(f"Updated configuration key '{key}' to value '{value}'")
 
-        
+        if self.state_manager:
+            self._notify_state_manager()
+            
 
     def _notify_state_manager(self):
         """Notify the StateManager about changes to the config."""
@@ -207,6 +165,10 @@ class Config:
         """Create the required directories if they don't exist."""
         for key, directory in self.directories.items():
             os.makedirs(directory, exist_ok=True)
+        
+        if 'logger' in self.general and self.general['logger']:
+            self.general['logger'].info(f"Ensuring directories exists")
+
 
     def _create_default_logger(self):
         logger = logging.getLogger(__name__)
@@ -231,15 +193,13 @@ class Config:
         if not os.path.exists(audio_file_path):
             raise FileNotFoundError(f"Audio file not found: {audio_file_path}")
 
-        # Extract details from the audio file
         audio_file_name = os.path.splitext(os.path.basename(audio_file_path))[0]
         self.general['audio_file'] = audio_file_path
 
-        # Update directories based on the new audio file
         self.directories['report_dir'] = os.path.join(self.directories['report_dir'], f"audio_{audio_file_name}")
 
 
         self._create_directories()
-        if self.state_manager is not None: # state manager is off when initialization or on stand alone use of config, otherwise, it should be on
-            self._notify_state_manager(self)
+        if self.state_manager is not None: 
+            self._notify_state_manager()
         self.general['logger'].info(f"Configuration updated for audio file: {audio_file_path}")
