@@ -52,7 +52,6 @@ import logging
 import os
 import sys
 import time
-import spacy
 
 # Set root directory to 'src'
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
@@ -122,15 +121,15 @@ class Config:
         }
         
 
-        self.nlp = {'spacy_model': spacy.load("en_core_web_sm"),
+        self.nlp = {'spacy_model':"en_core_web_sm",
                     'user_highlight_keywords': [],
                     'filler_words_removed': ["um", "uh", "like"]
         }
 
                     
-        
 
-        object.__setattr__(self, '_initialized', True)  # We set it directly to avoid triggering __setattr__
+
+
 
 
     def get_full_prompt(self):

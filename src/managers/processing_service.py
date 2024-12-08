@@ -2,6 +2,7 @@ from .audio_manager import AudioManager
 from .reporting_manager import ReportingManager
 from .transcription_manager import TranscriptionManager
 import os
+import spacy
 
 class ProcessingService:
     def __init__(self, config):
@@ -17,7 +18,10 @@ class ProcessingService:
         self.transcription_model_name= config.model_config['transcription_model_name']
 
         self.prompt =  config.get_full_prompt()
-        self.spacy_model= config.nlp['spacy_model']
+        self.spacy_model= spacy.load(config.nlp['spacy_model'])
+
+
+
         self.user_highlight_keywords= config.nlp['user_highlight_keywords']
         self.filler_words_removed=config.nlp['filler_words_removed']
 
@@ -41,7 +45,7 @@ class ProcessingService:
         self.logger= config.general['logger']
         self.device= config.general['device']
         self.transcription_model_name= config.model_config['transcription_model_name']
-        self.spacy_model= config.nlp['spacy_model']
+        self.spacy_model= spacy.load(config.nlp['spacy_model'])
         self.user_highlight_keywords= config.nlp['user_highlight_keywords']
         self.filler_words_removed=config.nlp['filler_words_removed']
         self.prompt =  config.get_full_prompt()
