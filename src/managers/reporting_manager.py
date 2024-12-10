@@ -11,13 +11,18 @@ class ReportingManager:
     def __init__(self, 
                  logger, 
                  spacy_model, user_highlight_keywords, 
-                 filler_words_removed, report_dir= None):
+                 filler_words_removed, report_dir= None,
+                 audio_file=None,
+                 show_report_flag=False):
 
         self.spacy_model = spacy_model
         self.user_highlight_keywords= user_highlight_keywords
         self.filler_words_removed= filler_words_removed
         self.logger = logger  # Use the logger from config
         self.report_dir= report_dir
+        self.audio_file_name = audio_file # file name of the audio, to be used for play back
+        self.show_report_flag = show_report_flag # show the report after generation if True
+
 
     def report(self, transcription, word_timestamps, audio_file_name=None):
         # Log the report generation start
