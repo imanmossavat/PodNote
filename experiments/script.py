@@ -14,7 +14,7 @@ def main():
     parser.add_argument('audio_file', type=str, help="Path to the audio file to transcribe.")
     args = parser.parse_args()
 
-    if args.audio_fi
+
 
     # Step 2: Set up the configuration (Config) for the system
     config = Config()
@@ -34,9 +34,6 @@ def main():
         ui_manager.process_audio()
         ui_manager.transcribe()
         ui_manager.report()
-
-        # Step 6: Log the successful processing and report generation
-        print(f"Successfully processed and transcribed {audio_file}.")
     
     except Exception as e:
         # Log any errors that occur during the process

@@ -11,7 +11,7 @@ class ProcessingService:
         self.target_sample_rate = config.general['target_sample_rate']
         self.logger= config.general['logger']
         self.device= config.general['device']
-        self.audio_file = config.general['audio_file']
+        self.audio_file_name = config.general['audio_file']
 
         self.report_dir = config.directories['report_dir']
 
@@ -40,7 +40,8 @@ class ProcessingService:
                                                   spacy_model= self.spacy_model,
                                                   user_highlight_keywords= self.user_highlight_keywords,
                                                   filler_words_removed= self.filler_words_removed,
-                                                  report_dir= self.report_dir)
+                                                  report_dir= self.report_dir,
+                                                  audio_file_name= self.audio_file_name)
 
     def update_config(self, config):
         self.report_dir = config.directories['report_dir']
@@ -52,7 +53,7 @@ class ProcessingService:
         self.user_highlight_keywords= config.nlp['user_highlight_keywords']
         self.filler_words_removed=config.nlp['filler_words_removed']
         self.prompt =  config.get_full_prompt()
-        self.audio_file = config.general['audio_file']
+        self.audio_file_name = config.general['audio_file']
         self.open_report_after_save = config.general['open_report_after_save']
 
 
@@ -72,6 +73,7 @@ class ProcessingService:
         self.reporting_manager.filler_words_removed= self.filler_words_removed
         self.reporting_manager.report_dir= self.report_dir
         self.reporting_manager.open_report_after_save= self.open_report_after_save
+        self.reporting_manager.audio_file_name= self.audio_file_name
                                                 
 
     def process_audio(self, audio_file):
@@ -93,11 +95,8 @@ class ProcessingService:
             self.logger.info(f'no timestampes available to report, first transcribe')
         else:
             
-            audio_file_name = os.path.splitext(os.path.basename(self.audio_file))[0]
-
             self.reporting_manager.report(
             transcription= self.transcription_manager.transcription,
             word_timestamps= self.transcription_manager.word_timestamps,
-            audio_file_name= audio_file_name
              )
 

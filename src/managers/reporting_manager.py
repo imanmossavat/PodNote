@@ -1,17 +1,15 @@
-# src/managers/audio_segmentation_manager.py
 import os
 from datetime import timedelta
 import time
 import re
 from collections import Counter
-import webbrowser
 
 class ReportingManager:
     def __init__(self, 
                  logger, 
                  spacy_model, user_highlight_keywords, 
                  filler_words_removed, report_dir= None,
-                 audio_file=None,
+                 audio_file_name=None,
                  open_report_after_save=False):
 
         self.spacy_model = spacy_model
@@ -19,10 +17,13 @@ class ReportingManager:
         self.filler_words_removed = filler_words_removed
         self.logger = logger  # Use the logger from config
         self.report_dir = report_dir
-        self.audio_file_name = audio_file  # file name of the audio, to be used for playback
+        self.audio_file_name = audio_file_name  # file name of the audio, to be used for playback
+
+        print(f"audio file name is {audio_file_name}")
         self.open_report_after_save = open_report_after_save  # show the report after generation if True
 
-    def report(self, transcription, word_timestamps, audio_file_name=None):
+    def report(self, transcription, word_timestamps):
+        audio_file_name= self.audio_file_name
         # Log the report generation start
         self.logger.info("Generating report for audio file: %s", audio_file_name)
 
@@ -45,7 +46,7 @@ class ReportingManager:
 
         # Save the markdown file
         timestamp = int(time.time())  # every report has its own timestamp!
-        self.save_markdown(chunks, audio_file_name, timestamp=timestamp)
+        self.save_markdown(chunks, timestamp=timestamp)
 
     def extract_keywords(self, transcript, top_m=10):
         doc = self.spacy_model(transcript)
@@ -78,38 +79,6 @@ class ReportingManager:
             text = text.replace(f" {word} ", f" <span style='color: red;'>{word}</span> ")
         return text
 
-    def save_markdown(self, chunks, audio_file_name, timestamp=None):
-        # Define the report directory from the config
-        report_dir = self.report_dir
-        os.makedirs(report_dir, exist_ok=True)  # Ensure the directory exists
-
-        if timestamp is None:
-            timestamp = int(time.time())
-        md_filename = os.path.join(report_dir, f"{os.path.splitext(audio_file_name)[0]}_{timestamp}.md")
-
-        try:
-            with open(md_filename, "w") as md_file:
-                md_file.write("# Table of Contents\n")
-                for idx in range(len(chunks)):
-                    md_file.write(f"- [Chunk {idx + 1}](#chunk-{idx + 1})\n")
-                md_file.write("\n")
-
-                # Embed the audio player once in the report
-                audio_player_html = self.generate_audio_player_html(audio_file_name)
-                md_file.write(f"{audio_player_html}\n")
-
-                for idx, (chunk, start_time, end_time) in enumerate(chunks):
-                    md_file.write(f"### Chunk {idx + 1} (Start: {self.seconds_to_hms(start_time)}, End: {self.seconds_to_hms(end_time)}):\n")
-                    md_file.write(f"{chunk}\n\n")
-            self.logger.info(f"Markdown file saved: {md_filename}")
-
-            if self.open_report_after_save:
-                # Convert file path to URL format and open it in the browser
-                file_url = f"file:///{os.path.abspath(md_filename)}"
-                webbrowser.open(file_url)
-
-        except Exception as e:
-            self.logger.error(f"Failed to save markdown file: {e}")
 
     def split_text_into_chunks(self, word_timestamps):
         """
@@ -158,13 +127,16 @@ class ReportingManager:
 
         return chunks
 
-    def generate_audio_player_html(self, audio_file_name):
+    def generate_audio_player_html(self):
         """
         Generates the HTML for an audio player that can be used for embedding in markdown.
         The player allows playback control and seeks to the specified timestamps.
         """
         # Ensure the audio file is accessible via a URL (modify as necessary depending on your setup)
-        audio_url = f"/path/to/audio/files/{audio_file_name}"
+        audio_file_name= self.audio_file_name
+        audio_url= audio_file_name
+
+        #audio_url = f"/path/to/audio/files/{audio_file_name}"
 
         return f"""
         <audio id="audio_player" controls>
@@ -179,3 +151,63 @@ class ReportingManager:
             }}
         </script>
         """
+    def save_markdown(self, chunks, timestamp=None):
+        """
+        Saves the segmented audio transcription into a Markdown file, formatted for Obsidian.
+        """
+        # Define the report directory from the config
+        report_dir = self.report_dir
+        os.makedirs(report_dir, exist_ok=True)  # Ensure the directory exists
+        audio_file_name= self.audio_file_name
+
+        if timestamp is None:
+            timestamp = int(time.time())
+        
+        md_filename = os.path.join(report_dir, f"{os.path.splitext(os.path.basename(audio_file_name))[0]}_{timestamp}.md")
+
+
+        try:
+            with open(md_filename, "w") as md_file:
+                # Add a link to the audio file
+                md_file.write(f"[Audio File](file://{os.path.abspath(audio_file_name)})\n\n")
+                
+                # Add a horizontal line for structure
+                md_file.write("---\n\n")
+
+                # Table of Contents
+                md_file.write("# Table of Contents\n")
+                for idx, (chunk, start_time, end_time) in enumerate(chunks):
+                    start_hms = self.seconds_to_hms(start_time)
+                    end_hms = self.seconds_to_hms(end_time)
+                    chunk_label = f"Chunk {idx + 1} ({start_hms}-{end_hms})"
+                    chunk_link = f"[[#Chunk {idx + 1}|{chunk_label}]]"
+                    md_file.write(f"- {chunk_link}\n")
+                md_file.write("\n---\n\n")
+
+                # Keywords Section (placeholder if needed)
+                md_file.write("# Keywords\n")
+                md_file.write("List any extracted or user-defined keywords here.\n\n")
+                md_file.write("---\n\n")
+
+                # Embed the audio player
+                audio_player_html = self.generate_audio_player_html()
+                md_file.write(f"{audio_player_html}\n\n")
+                md_file.write("---\n\n")
+
+                # Write Chunks
+                for idx, (chunk, start_time, end_time) in enumerate(chunks):
+                    start_hms = self.seconds_to_hms(start_time)
+                    end_hms = self.seconds_to_hms(end_time)
+                    md_file.write(f"### Chunk {idx + 1}\n")
+                    md_file.write(f"**Start:** {start_hms}, **End:** {end_hms}\n\n")
+                    md_file.write(f"{chunk}\n\n")
+                    md_file.write("---\n\n")
+
+            self.logger.info(f"Markdown file saved: {md_filename}")
+
+            if self.open_report_after_save:
+                # Open the markdown file in the default application
+                os.system(f'open "{md_filename}"')
+
+        except Exception as e:
+            self.logger.error(f"Failed to save markdown file: {e}")
