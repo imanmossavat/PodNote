@@ -14,6 +14,8 @@ def main():
     parser.add_argument('audio_file', type=str, help="Path to the audio file to transcribe.")
     args = parser.parse_args()
 
+    if args.audio_fi
+
     # Step 2: Set up the configuration (Config) for the system
     config = Config()
 

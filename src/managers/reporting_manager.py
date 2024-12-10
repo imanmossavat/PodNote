@@ -4,8 +4,7 @@ from datetime import timedelta
 import time
 import re
 from collections import Counter
-#import spacy
-
+import webbrowser
 
 class ReportingManager:
     def __init__(self, 
@@ -13,16 +12,15 @@ class ReportingManager:
                  spacy_model, user_highlight_keywords, 
                  filler_words_removed, report_dir= None,
                  audio_file=None,
-                 show_report_flag=False):
+                 open_report_after_save=False):
 
         self.spacy_model = spacy_model
-        self.user_highlight_keywords= user_highlight_keywords
-        self.filler_words_removed= filler_words_removed
+        self.user_highlight_keywords = user_highlight_keywords
+        self.filler_words_removed = filler_words_removed
         self.logger = logger  # Use the logger from config
-        self.report_dir= report_dir
-        self.audio_file_name = audio_file # file name of the audio, to be used for play back
-        self.show_report_flag = show_report_flag # show the report after generation if True
-
+        self.report_dir = report_dir
+        self.audio_file_name = audio_file  # file name of the audio, to be used for playback
+        self.open_report_after_save = open_report_after_save  # show the report after generation if True
 
     def report(self, transcription, word_timestamps, audio_file_name=None):
         # Log the report generation start
@@ -46,8 +44,8 @@ class ReportingManager:
         chunks = self.split_text_into_chunks(word_timestamps)
 
         # Save the markdown file
-        timestamp=  int(time.time()) # every report has its own timestamp!
-        self.save_markdown(chunks, audio_file_name, timestamp= timestamp)
+        timestamp = int(time.time())  # every report has its own timestamp!
+        self.save_markdown(chunks, audio_file_name, timestamp=timestamp)
 
     def extract_keywords(self, transcript, top_m=10):
         doc = self.spacy_model(transcript)
@@ -96,10 +94,20 @@ class ReportingManager:
                     md_file.write(f"- [Chunk {idx + 1}](#chunk-{idx + 1})\n")
                 md_file.write("\n")
 
+                # Embed the audio player once in the report
+                audio_player_html = self.generate_audio_player_html(audio_file_name)
+                md_file.write(f"{audio_player_html}\n")
+
                 for idx, (chunk, start_time, end_time) in enumerate(chunks):
                     md_file.write(f"### Chunk {idx + 1} (Start: {self.seconds_to_hms(start_time)}, End: {self.seconds_to_hms(end_time)}):\n")
                     md_file.write(f"{chunk}\n\n")
             self.logger.info(f"Markdown file saved: {md_filename}")
+
+            if self.open_report_after_save:
+                # Convert file path to URL format and open it in the browser
+                file_url = f"file:///{os.path.abspath(md_filename)}"
+                webbrowser.open(file_url)
+
         except Exception as e:
             self.logger.error(f"Failed to save markdown file: {e}")
 
@@ -129,7 +137,6 @@ class ReportingManager:
         current_chunk = ""
         current_start_time = word_timestamps[0]['start']
         current_end_time = None
-        sentence_start_time = word_timestamps[0]['start']
 
         for i, segment in enumerate(word_timestamps):
             segment_text = segment['text']
@@ -150,3 +157,25 @@ class ReportingManager:
             chunks.append((current_chunk.strip(), current_start_time, current_end_time))
 
         return chunks
+
+    def generate_audio_player_html(self, audio_file_name):
+        """
+        Generates the HTML for an audio player that can be used for embedding in markdown.
+        The player allows playback control and seeks to the specified timestamps.
+        """
+        # Ensure the audio file is accessible via a URL (modify as necessary depending on your setup)
+        audio_url = f"/path/to/audio/files/{audio_file_name}"
+
+        return f"""
+        <audio id="audio_player" controls>
+            <source src="{audio_url}" type="audio/mpeg">
+            Your browser does not support the audio element.
+        </audio>
+        <script>
+            function playAudioAtTime(time) {{
+                var audio = document.getElementById('audio_player');
+                audio.currentTime = time;
+                audio.play();
+            }}
+        </script>
+        """

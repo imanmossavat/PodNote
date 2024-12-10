@@ -2,3 +2,4 @@ torchaudio
 torch
 spacy
 whisper
+webbrowser

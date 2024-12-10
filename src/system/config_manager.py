@@ -31,7 +31,8 @@ class Config:
             'logger': None,
             'device': 'cpu',
             'audio_file': None,
-            'target_sample_rate': target_sample_rate 
+            'target_sample_rate': target_sample_rate,
+            'open_report_after_save': True
         }        
         if data_dir is None:
             data_dir = os.path.join(root_dir, 

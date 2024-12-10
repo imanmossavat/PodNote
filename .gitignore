@@ -2,3 +2,5 @@
 *.log
 *.wav
 data/**/*.wav
+data/*.json
+.obsidian

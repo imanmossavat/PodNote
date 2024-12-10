@@ -24,6 +24,7 @@ class ProcessingService:
 
         self.user_highlight_keywords= config.nlp['user_highlight_keywords']
         self.filler_words_removed=config.nlp['filler_words_removed']
+        self.open_report_after_save = config.general['open_report_after_save']
 
         self.audio_manager = AudioManager(logger= self.logger, target_sample_rate= self.target_sample_rate)
         
@@ -52,6 +53,7 @@ class ProcessingService:
         self.filler_words_removed=config.nlp['filler_words_removed']
         self.prompt =  config.get_full_prompt()
         self.audio_file = config.general['audio_file']
+        self.open_report_after_save = config.general['open_report_after_save']
 
 
         self.audio_manager.logger= self.logger
@@ -69,6 +71,7 @@ class ProcessingService:
         self.reporting_manager.user_highlight_keywords= self.user_highlight_keywords
         self.reporting_manager.filler_words_removed= self.filler_words_removed
         self.reporting_manager.report_dir= self.report_dir
+        self.reporting_manager.open_report_after_save= self.open_report_after_save
                                                 
 
     def process_audio(self, audio_file):
