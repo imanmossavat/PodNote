@@ -6,13 +6,19 @@ import argparse
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
 sys.path.append(root_dir)
 
-from src import Config, UIManager
 
+sys.argv = ['script.py', r"C:\Users\imanm\OneDrive\Documents\podcast\lazy dynmics\retake\promo_.wav"]
+
+
+from src import Config, UIManager
 def main():
     # Step 1: Set up command-line argument parsing for the audio file
     parser = argparse.ArgumentParser(description="Transcribe a podcast audio file to markdown.")
     parser.add_argument('audio_file', type=str, help="Path to the audio file to transcribe.")
+
     args = parser.parse_args()
+
+
 
 
 
