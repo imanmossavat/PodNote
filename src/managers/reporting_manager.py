@@ -10,14 +10,14 @@ import urllib.parse  # This is for encoding the file paths properly
 
 class ReportingManager:
     def __init__(self, logger, spacy_model, user_highlight_keywords,
-                 filler_words_removed, report_dir=None, audio_file_name=None, open_report_after_save=False):
+                 filler_words_removed, chunk_size, report_dir=None, audio_file_name=None, open_report_after_save=False):
         self.logger = logger
         self.report_dir = report_dir
         self._audio_file_name = audio_file_name  # Internal variable for the audio file name
         self.open_report_after_save = open_report_after_save
         self.nlp_service = NLPService(spacy_model, user_highlight_keywords, filler_words_removed)
         self.audio_handler = AudioFileHandler(audio_file_name)
-        self.chunk_formatter = ChunkFormatter(spacy_model)
+        self.chunk_formatter = ChunkFormatter(spacy_model, chunk_size)
         self.markdown_saver = MarkdownSaver(report_dir, audio_file_name, open_report_after_save)
 
     @property
@@ -32,23 +32,30 @@ class ReportingManager:
         self.markdown_saver.audio_file_name = new_audio_file_name
         self.logger.info(f"Audio file name updated to: {new_audio_file_name}")
 
+
     def report(self, transcription, word_timestamps):
         audio_file_name = self.audio_file_name
         self.logger.info("Generating report for audio file: %s", audio_file_name)
 
+        # Process transcription and extract keywords
         updated_transcription, keywords = self.nlp_service.extract_keywords(transcription)
         self.logger.info(f"Top keywords: {keywords}")
 
+        # Highlight keywords in the transcription
         highlighted_transcription = self.nlp_service.highlight_keywords(updated_transcription)
         toc = self.nlp_service.generate_table_of_contents(highlighted_transcription)
         self.logger.info(f"Table of Contents generated.")
 
+        # Format filler words
         formatted_text = self.nlp_service.format_filler_text(highlighted_transcription)
 
+        # Split text into chunks while respecting sentence boundaries and token limits
         chunks = self.chunk_formatter.split_text_into_chunks(word_timestamps)
-        timestamp = int(time.time())
-        self.markdown_saver.save_markdown(chunks, timestamp=timestamp)
 
+        timestamp = int(time.time())
+
+        # Save the markdown report
+        self.markdown_saver.save_markdown(chunks, timestamp=timestamp)
 
 class NLPService:
     def __init__(self, spacy_model, user_highlight_keywords, filler_words_removed):
@@ -102,34 +109,45 @@ class AudioFileHandler:
         </script>
         """
 
-
 class ChunkFormatter:
-    def __init__(self, spacy_model):
+    def __init__(self, spacy_model, chunk_size):
         self.spacy_model = spacy_model
+        self.chunk_size = chunk_size  # max token size for each chunk
 
     def split_text_into_chunks(self, word_timestamps):
+        # Tokenize the entire transcription text
         doc = self.spacy_model(" ".join([segment['text'] for segment in word_timestamps]))
         chunks = []
-        current_chunk = ""
+        current_chunk = []
         current_start_time = word_timestamps[0]['start']
         current_end_time = None
+        current_token_count = 0
 
+        # Iterate over each word in the word_timestamps
         for i, segment in enumerate(word_timestamps):
             segment_text = segment['text']
             current_end_time = segment['end']
+            doc_segment = self.spacy_model(segment_text)  # Tokenize the segment text
 
-            current_chunk += " " + segment_text
+            # Check if adding this segment exceeds the chunk size
+            if current_token_count + len(doc_segment) > self.chunk_size:
+                # Finalize the current chunk and start a new one
+                chunks.append((current_chunk, current_start_time, current_end_time))
+                current_chunk = [segment_text]  # Start a new chunk with this segment
+                current_start_time = segment['start']  # Update the start time
+                current_token_count = len(doc_segment)  # Reset token count for the new chunk
+            else:
+                # Add the segment to the current chunk
+                current_chunk.append(segment_text)
+                current_token_count += len(doc_segment)
 
-            if doc[sum([len([s['text'] for s in word_timestamps[:i]]) for i in range(i)])].is_sent_end:
-                chunks.append((current_chunk.strip(), current_start_time, current_end_time))
-                current_chunk = ""
-                current_start_time = segment['start']
-
+        # Append the last chunk if there is any remaining text
         if current_chunk:
-            chunks.append((current_chunk.strip(), current_start_time, current_end_time))
+            chunks.append((current_chunk, current_start_time, current_end_time))
 
         return chunks
- 
+
+    
 
 class MarkdownSaver:
     def __init__(self, report_dir, audio_file_name, open_report_after_save=False):
@@ -159,6 +177,8 @@ class MarkdownSaver:
                 md_file.write(f"[Audio File](file://{encoded_audio_file_path})\n\n")
                 md_file.write("---\n\n")
                 md_file.write("# Table of Contents\n")
+
+                # Write ToC with chunk start time links
                 for idx, (chunk, start_time, end_time) in enumerate(chunks):
                     start_hms = self.seconds_to_hms(start_time)
                     end_hms = self.seconds_to_hms(end_time)
@@ -171,17 +191,18 @@ class MarkdownSaver:
                 md_file.write("List any extracted or user-defined keywords here.\n\n")
                 md_file.write("---\n\n")
 
-                # Assuming AudioFileHandler is available
+                # Add audio player to markdown
                 audio_player_html = AudioFileHandler(self.audio_file_name).generate_audio_player_html()
                 md_file.write(f"{audio_player_html}\n\n")
                 md_file.write("---\n\n")
 
+                # Add the chunk details
                 for idx, (chunk, start_time, end_time) in enumerate(chunks):
                     start_hms = self.seconds_to_hms(start_time)
                     end_hms = self.seconds_to_hms(end_time)
                     md_file.write(f"### Chunk {idx + 1}\n")
                     md_file.write(f"**Start:** {start_hms}, **End:** {end_hms}\n\n")
-                    md_file.write(f"{chunk}\n\n")
+                    md_file.write(f"{' '.join(chunk)}\n\n")
                     md_file.write("---\n\n")
 
             if self.open_report_after_save:
@@ -193,3 +214,4 @@ class MarkdownSaver:
 
     def seconds_to_hms(self, seconds):
         return str(timedelta(seconds=seconds))[:8]
+

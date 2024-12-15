@@ -7,8 +7,11 @@ root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
 sys.path.append(root_dir)
 
 
-sys.argv = ['script.py', r"C:\Users\imanm\OneDrive\Documents\podcast\lazy dynmics\retake\promo_.wav"]
+#sys.argv = ['script.py', r"C:\Users\imanm\OneDrive\Documents\podcast\lazy dynmics\retake\promo_.wav"]
 
+#sys.argv= ['script.py', r"C:\Users\imanm\OneDrive\Documents\podcast\Diedrik roijers\snippet_test_Diedrerik.wav"]
+
+sys.argv= ['script.py', r"C:\Users\imanm\OneDrive\Documents\podcast\Diedrik roijers\diedrik_mixdown_mono_24.wav"]
 
 from src import Config, UIManager
 def main():

@@ -67,7 +67,7 @@ class Config:
         
         self.prompt = {
             'filler': "I'm like, you know what I mean, kind of, um, ah, huh, and so, so um, uh, and um, like um, so like, like it's, it's like, i mean, yeah, ok so, uh so, so uh, yeah so, you know, it's uh, uh and, and uh, like, kind", 
-            'domain': ""
+            'domain': "Iman Mossavat, Fontys, Eindhoven, Diederik roijers, Brainport, TUE (technical university of Eindhoven), legistavely, GDPR "
         }
         
         self.nlp = {'spacy_model':"en_core_web_sm",

@@ -20,7 +20,7 @@ class ProcessingService:
         self.prompt =  config.get_full_prompt()
         self.spacy_model= spacy.load(config.nlp['spacy_model'])
 
-
+        self.chunk_size= config.model_config['chunk_size']
 
         self.user_highlight_keywords= config.nlp['user_highlight_keywords']
         self.filler_words_removed=config.nlp['filler_words_removed']
@@ -40,6 +40,7 @@ class ProcessingService:
                                                   spacy_model= self.spacy_model,
                                                   user_highlight_keywords= self.user_highlight_keywords,
                                                   filler_words_removed= self.filler_words_removed,
+                                                  chunk_size= self.chunk_size,
                                                   report_dir= self.report_dir,
                                                   audio_file_name= self.audio_file_name)
 
