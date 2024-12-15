@@ -1,4 +1,4 @@
-# Podcast Audio to Markdown
+# Podcast Audio to Markdown/HTML
 
 This project provides a tool to convert podcast audio files into a structured markdown format. It uses speech recognition to transcribe the audio and then formats the output into a markdown file for easier reading and analysis.
 
