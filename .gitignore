@@ -4,3 +4,4 @@
 data/**/*.wav
 data/*.json
 .obsidian
+docs/issues.txt
