@@ -23,6 +23,7 @@ class Config:
                  job_name='default_job',
                  target_sample_rate=16000,
                  timestamp_format="%Y%m%d-%H%M%S",
+                 report_format= 'html'
                 ):
         
         self.general = {
@@ -32,7 +33,8 @@ class Config:
             'device': 'cpu',
             'audio_file': None,
             'target_sample_rate': target_sample_rate,
-            'open_report_after_save': False
+            'open_report_after_save': False,
+            'report_format': report_format
         }        
         if data_dir is None:
             data_dir = os.path.join(root_dir, 

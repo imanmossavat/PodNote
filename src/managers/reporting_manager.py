@@ -6,19 +6,26 @@ from collections import Counter
 import urllib.parse  # This is for encoding the file paths properly
 
 
-
-
 class ReportingManager:
     def __init__(self, logger, spacy_model, user_highlight_keywords,
-                 filler_words_removed, chunk_size, report_dir=None, audio_file_name=None, open_report_after_save=False):
+                 filler_words_removed, chunk_size, report_dir=None, audio_file_name=None, open_report_after_save=False, report_format=None):
         self.logger = logger
         self.report_dir = report_dir
-        self._audio_file_name = audio_file_name  # Internal variable for the audio file name
+        self._audio_file_name = audio_file_name
         self.open_report_after_save = open_report_after_save
+        self.report_format = report_format
         self.nlp_service = NLPService(spacy_model, user_highlight_keywords, filler_words_removed)
         self.audio_handler = AudioFileHandler(audio_file_name)
         self.chunk_formatter = ChunkFormatter(spacy_model, chunk_size)
-        self.markdown_saver = MarkdownSaver(report_dir, audio_file_name, open_report_after_save)
+
+        if report_format == 'html':
+            self.report_saver = HTMLSaver(report_dir, audio_file_name, open_report_after_save)
+        elif 'markdown':
+            self.report_saver = MarkdownSaver(report_dir, audio_file_name, open_report_after_save)
+        else:
+            raise ValueError(f"Unidentified report format: {report_format}")
+
+
 
     @property
     def audio_file_name(self):
@@ -27,11 +34,9 @@ class ReportingManager:
     @audio_file_name.setter
     def audio_file_name(self, new_audio_file_name):
         self._audio_file_name = new_audio_file_name
-        # Inform dependent components (e.g., AudioFileHandler, MarkdownSaver) of the update
         self.audio_handler.audio_file_name = new_audio_file_name
-        self.markdown_saver.audio_file_name = new_audio_file_name
+        self.report_saver.audio_file_name = new_audio_file_name
         self.logger.info(f"Audio file name updated to: {new_audio_file_name}")
-
 
     def report(self, transcription, word_timestamps):
         audio_file_name = self.audio_file_name
@@ -54,8 +59,9 @@ class ReportingManager:
 
         timestamp = int(time.time())
 
-        # Save the markdown report
-        self.markdown_saver.save_markdown(chunks, timestamp=timestamp)
+        # Save the report in the chosen format (HTML or Markdown)
+        self.report_saver.save_html(chunks, timestamp=timestamp) if self.report_format == 'html' else self.report_saver.save_markdown(chunks, timestamp=timestamp)
+
 
 class NLPService:
     def __init__(self, spacy_model, user_highlight_keywords, filler_words_removed):
@@ -215,3 +221,66 @@ class MarkdownSaver:
     def seconds_to_hms(self, seconds):
         return str(timedelta(seconds=seconds))[:8]
 
+class HTMLSaver:
+    def __init__(self, report_dir, audio_file_name, open_report_after_save=False):
+        self.report_dir = report_dir
+        self.audio_file_name = audio_file_name
+        self.open_report_after_save = open_report_after_save
+
+    def save_html(self, chunks, timestamp=None):
+        report_dir = self.report_dir
+        os.makedirs(report_dir, exist_ok=True)
+        if timestamp is None:
+            timestamp = int(time.time())
+
+        html_filename = os.path.join(report_dir, f"{os.path.splitext(os.path.basename(self.audio_file_name))[0]}_{timestamp}.html")
+
+        try:
+            # Get absolute file path and replace backslashes with forward slashes
+            abs_file_path = os.path.abspath(self.audio_file_name)
+            abs_file_path = abs_file_path.replace("\\", "/")  # Convert backslashes to forward slashes
+
+            # Encode the path
+            encoded_audio_file_path = urllib.parse.quote(abs_file_path)
+
+            # Write HTML content
+            with open(html_filename, "w") as html_file:
+                html_file.write("<html><head><title>Audio Report</title></head><body>")
+                html_file.write(f"<h1>Audio File: <a href='file://{encoded_audio_file_path}'>Download</a></h1>\n")
+                html_file.write("<h2>Table of Contents</h2><ul>")
+
+                # Write ToC with chunk start time links
+                for idx, (chunk, start_time, end_time) in enumerate(chunks):
+                    start_hms = self.seconds_to_hms(start_time)
+                    end_hms = self.seconds_to_hms(end_time)
+                    chunk_label = f"Chunk {idx + 1} ({start_hms}-{end_hms})"
+                    chunk_link = f"<a href='#chunk_{idx + 1}'>{chunk_label}</a>"
+                    html_file.write(f"<li>{chunk_link}</li>")
+                html_file.write("</ul>")
+
+                html_file.write("<h2>Keywords</h2><p>List any extracted or user-defined keywords here.</p>")
+
+                # Add audio player to HTML
+                audio_player_html = AudioFileHandler(self.audio_file_name).generate_audio_player_html()
+                html_file.write(f"{audio_player_html}")
+
+                # Add the chunk details
+                for idx, (chunk, start_time, end_time) in enumerate(chunks):
+                    start_hms = self.seconds_to_hms(start_time)
+                    end_hms = self.seconds_to_hms(end_time)
+                    html_file.write(f"<h3 id='chunk_{idx + 1}'>Chunk {idx + 1}</h3>")
+                    html_file.write(f"<p><strong>Start:</strong> {start_hms}, <strong>End:</strong> {end_hms}</p>")
+                    html_file.write("<p>" + " ".join(chunk) + "</p>")
+                    html_file.write("<hr>")
+
+                html_file.write("</body></html>")
+
+            if self.open_report_after_save:
+                os.system(f'open "{html_filename}"')
+            print(f"\nHTML file saved: {html_filename}\n")
+
+        except Exception as e:
+            print(f"Failed to save HTML file: {e}")
+
+    def seconds_to_hms(self, seconds):
+        return str(timedelta(seconds=seconds))[:8]

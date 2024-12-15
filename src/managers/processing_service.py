@@ -12,6 +12,7 @@ class ProcessingService:
         self.logger= config.general['logger']
         self.device= config.general['device']
         self.audio_file_name = config.general['audio_file']
+        self.report_format = config.general['report_format']
 
         self.report_dir = config.directories['report_dir']
 
@@ -42,7 +43,8 @@ class ProcessingService:
                                                   filler_words_removed= self.filler_words_removed,
                                                   chunk_size= self.chunk_size,
                                                   report_dir= self.report_dir,
-                                                  audio_file_name= self.audio_file_name)
+                                                  audio_file_name= self.audio_file_name,
+                                                  report_format= self.report_format)
 
     def update_config(self, config):
         self.report_dir = config.directories['report_dir']
