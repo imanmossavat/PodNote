@@ -58,7 +58,7 @@ class UIManager:
     def report(self):
         try:
             self.processing_service.report()
-            self.logger.info("Report generated successfully.")
+#            self.logger.info("Report generated successfully.")
         except Exception as e:
             self.logger.error(f"Error generating report: {e}")
             raise

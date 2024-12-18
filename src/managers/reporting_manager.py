@@ -5,6 +5,8 @@ import re
 from collections import Counter
 import urllib.parse  # This is for encoding the file paths properly
 
+import logging
+
 
 class ReportingManager:
     def __init__(self, logger, spacy_model, user_highlight_keywords,
@@ -37,7 +39,7 @@ class ReportingManager:
         self.audio_handler.audio_file_name = new_audio_file_name
         self.report_saver.audio_file_name = new_audio_file_name
         self.logger.info(f"Audio file name updated to: {new_audio_file_name}")
-
+  
     def report(self, transcription, word_timestamps):
         audio_file_name = self.audio_file_name
         self.logger.info("Generating report for audio file: %s", audio_file_name)
@@ -48,8 +50,6 @@ class ReportingManager:
 
         # Highlight keywords in the transcription
         highlighted_transcription = self.nlp_service.highlight_keywords(updated_transcription)
-        toc = self.nlp_service.generate_table_of_contents(highlighted_transcription)
-        self.logger.info(f"Table of Contents generated.")
 
         # Format filler words
         formatted_text = self.nlp_service.format_filler_text(highlighted_transcription)
@@ -57,10 +57,48 @@ class ReportingManager:
         # Split text into chunks while respecting sentence boundaries and token limits
         chunks = self.chunk_formatter.split_text_into_chunks(word_timestamps)
 
+        # Generate Table of Contents
+        toc_body = [
+            f"<a href='#chunk_{idx + 1}'>Chunk {idx + 1} ({self.report_saver.seconds_to_hms(start_time)}-{self.report_saver.seconds_to_hms(end_time)})</a>"
+            for idx, (_, start_time, end_time) in enumerate(chunks)
+        ]
+
+        # Define sections for the report
+        sections = [
+            {
+                'type': 'text',
+                'id': 'summary',
+                'header': 'Summary',
+                'body': 'This is an auto-generated summary of the audio file.'
+            },
+            {
+                'type': 'audio',
+                'id': 'audio_player',
+                'header': 'Audio Player',
+                'body': AudioFileHandler(self.audio_file_name).generate_audio_player_html()
+            },
+            {
+                'type': 'toc',
+                'id': 'toc',
+                'header': 'Table of Contents',
+                'body': toc_body  # Table of Contents with clickable links
+            },
+            {
+                'type': 'chunks',
+                'id': 'chunks',
+                'header': 'Audio Chunks',
+                'body': ''  # Body left empty; chunks will be dynamically rendered by HTMLSaver
+            }
+        ]
+
         timestamp = int(time.time())
 
         # Save the report in the chosen format (HTML or Markdown)
-        self.report_saver.save_html(chunks, timestamp=timestamp) if self.report_format == 'html' else self.report_saver.save_markdown(chunks, timestamp=timestamp)
+        if self.report_format == 'html':
+            self.report_saver.save_html(chunks, timestamp=timestamp, sections=sections)
+        else:
+            self.report_saver.save_markdown(chunks, timestamp=timestamp)
+
 
 
 class NLPService:
@@ -221,66 +259,103 @@ class MarkdownSaver:
     def seconds_to_hms(self, seconds):
         return str(timedelta(seconds=seconds))[:8]
 
+
+
+
 class HTMLSaver:
-    def __init__(self, report_dir, audio_file_name, open_report_after_save=False):
+    def __init__(self, report_dir, audio_file_name, open_report_after_save=False, logger=None):
         self.report_dir = report_dir
         self.audio_file_name = audio_file_name
         self.open_report_after_save = open_report_after_save
+        self.logger = logger or logging.getLogger(__name__)  # Use provided logger, or create a default logger
 
-    def save_html(self, chunks, timestamp=None):
+    def save_html(self, chunks, timestamp=None, sections=None):
+        if sections is None:
+            sections = []
+
         report_dir = self.report_dir
         os.makedirs(report_dir, exist_ok=True)
         if timestamp is None:
             timestamp = int(time.time())
 
         html_filename = os.path.join(report_dir, f"{os.path.splitext(os.path.basename(self.audio_file_name))[0]}_{timestamp}.html")
-
+        print(f"html students {html_filename}")
         try:
-            # Get absolute file path and replace backslashes with forward slashes
-            abs_file_path = os.path.abspath(self.audio_file_name)
-            abs_file_path = abs_file_path.replace("\\", "/")  # Convert backslashes to forward slashes
-
-            # Encode the path
+            # Get absolute file path and encode it for a proper download link
+            abs_file_path = os.path.abspath(self.audio_file_name).replace("\\", "/")
             encoded_audio_file_path = urllib.parse.quote(abs_file_path)
+
+            # Log the start of the HTML file creation process
+            self.logger.info(f"Creating HTML report for audio file: {self.audio_file_name}")
+            self.logger.info(f"Saving report to: {html_filename}")
 
             # Write HTML content
             with open(html_filename, "w") as html_file:
                 html_file.write("<html><head><title>Audio Report</title></head><body>")
                 html_file.write(f"<h1>Audio File: <a href='file://{encoded_audio_file_path}'>Download</a></h1>\n")
-                html_file.write("<h2>Table of Contents</h2><ul>")
 
-                # Write ToC with chunk start time links
-                for idx, (chunk, start_time, end_time) in enumerate(chunks):
-                    start_hms = self.seconds_to_hms(start_time)
-                    end_hms = self.seconds_to_hms(end_time)
-                    chunk_label = f"Chunk {idx + 1} ({start_hms}-{end_hms})"
-                    chunk_link = f"<a href='#chunk_{idx + 1}'>{chunk_label}</a>"
-                    html_file.write(f"<li>{chunk_link}</li>")
-                html_file.write("</ul>")
+                # Write the sections dynamically
+                for section in sections:
+                    section_type = section.get('type', '')
+                    section_id = section.get('id', None)
+                    section_header = section.get('header', '')
+                    section_body = section.get('body', '')
 
-                html_file.write("<h2>Keywords</h2><p>List any extracted or user-defined keywords here.</p>")
+                    self.logger.debug(f"Processing section: {section_id or section_header}")
 
-                # Add audio player to HTML
-                audio_player_html = AudioFileHandler(self.audio_file_name).generate_audio_player_html()
-                html_file.write(f"{audio_player_html}")
+                    html_file.write(f"<section id='{section_id}'>")
 
-                # Add the chunk details
-                for idx, (chunk, start_time, end_time) in enumerate(chunks):
-                    start_hms = self.seconds_to_hms(start_time)
-                    end_hms = self.seconds_to_hms(end_time)
-                    html_file.write(f"<h3 id='chunk_{idx + 1}'>Chunk {idx + 1}</h3>")
-                    html_file.write(f"<p><strong>Start:</strong> {start_hms}, <strong>End:</strong> {end_hms}</p>")
-                    html_file.write("<p>" + " ".join(chunk) + "</p>")
-                    html_file.write("<hr>")
+                    # Add section header (if exists)
+                    if section_header:
+                        html_file.write(f"<h2>{section_header}</h2>")
+
+                    # Handle different section types
+                    if section_type == 'toc':
+                        self.logger.debug(f"Rendering Table of Contents with {len(section_body)} items.")
+                        html_file.write("<ul>")
+                        for item in section_body:
+                            html_file.write(f"<li>{item}</li>")
+                        html_file.write("</ul>")
+
+                    elif section_type == 'text':
+                        # Render simple text content
+                        html_file.write(f"<p>{section_body}</p>")
+
+                    elif section_type == 'audio':
+                        # Render the audio player
+                        html_file.write(section_body)
+
+                    elif section_type == 'chunks':
+                        # Render chunks dynamically
+                        self.logger.debug(f"Rendering {len(chunks)} chunks.")
+                        for idx, (chunk, start_time, end_time) in enumerate(chunks):
+                            start_hms = self.seconds_to_hms(start_time)
+                            end_hms = self.seconds_to_hms(end_time)
+                            html_file.write(f"<h3 id='chunk_{idx + 1}'>Chunk {idx + 1}</h3>")
+                            html_file.write(f"<p><strong>Start:</strong> {start_hms}, <strong>End:</strong> {end_hms}</p>")
+                            html_file.write("<p>" + " ".join(chunk) + "</p>")
+                            html_file.write("<hr>")
+
+                    else:
+                        # Fallback: Render unknown types as plain text
+                        html_file.write(f"<p>{section_body}</p>")
+
+                    html_file.write("</section>")
 
                 html_file.write("</body></html>")
 
+            # Log successful saving of the HTML file
+            self.logger.info(f"HTML report successfully saved: {html_filename}")
+
+            # Open the HTML file after saving (if enabled)
             if self.open_report_after_save:
+                self.logger.info(f"Opening HTML file: {html_filename}")
                 os.system(f'open "{html_filename}"')
-            print(f"\nHTML file saved: {html_filename}\n")
 
         except Exception as e:
-            print(f"Failed to save HTML file: {e}")
+            # Log the error
+            self.logger.error(f"Failed to save HTML file: {e}")
+            raise
 
     def seconds_to_hms(self, seconds):
         return str(timedelta(seconds=seconds))[:8]
