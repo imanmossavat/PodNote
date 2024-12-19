@@ -171,26 +171,31 @@ class ChunkFormatter:
         # Iterate over each word in the word_timestamps
         for i, segment in enumerate(word_timestamps):
             segment_text = segment['text']
-            current_end_time = segment['end']
+            segment_start_time = segment['start']
+            segment_end_time = segment['end']
             doc_segment = self.spacy_model(segment_text)  # Tokenize the segment text
 
             # Check if adding this segment exceeds the chunk size
             if current_token_count + len(doc_segment) > self.chunk_size:
-                # Finalize the current chunk and start a new one
-                chunks.append((current_chunk, current_start_time, current_end_time))
+                # Finalize the current chunk using the last segment's start time
+                chunks.append((current_chunk, current_start_time, segment_start_time))
                 current_chunk = [segment_text]  # Start a new chunk with this segment
-                current_start_time = segment['start']  # Update the start time
+                current_start_time = segment_start_time  # Update the start time
                 current_token_count = len(doc_segment)  # Reset token count for the new chunk
             else:
                 # Add the segment to the current chunk
                 current_chunk.append(segment_text)
                 current_token_count += len(doc_segment)
+            
+            # Update the current end time with the last segment's end time
+            current_end_time = segment_end_time
 
         # Append the last chunk if there is any remaining text
         if current_chunk:
             chunks.append((current_chunk, current_start_time, current_end_time))
 
         return chunks
+
     
     def format_chunks_as_html(self, chunks):
         """Formats the chunks into an HTML string."""
