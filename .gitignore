@@ -7,4 +7,5 @@ data/*.json
 docs/issues.txt
 *.html
 *.md
+*.txt
 

@@ -96,7 +96,7 @@ class ReportingManager:
 
         # Save the report in the chosen format (HTML or Markdown)
         if self.report_format == 'html':
-            self.report_saver.save_html(timestamp=timestamp, sections=sections)
+            self.report_saver.create_and_save_html(timestamp=timestamp, sections=sections)
         else:
             self.report_saver.save_markdown(chunks, timestamp=timestamp)
 
@@ -278,95 +278,147 @@ class MarkdownSaver:
         except Exception as e:
             print(f"Failed to save markdown file: {e}")
 
-
 class HTMLSaver:
     def __init__(self, report_dir, audio_file_name, open_report_after_save=False, logger=None):
         self.report_dir = report_dir
         self.audio_file_name = audio_file_name
         self.open_report_after_save = open_report_after_save
-        self.logger = logger or logging.getLogger(__name__)  # Use provided logger, or create a default logger
+        self.logger = logger or logging.getLogger(__name__)
 
-    def save_html(self, timestamp=None, sections=None):
+    def create_and_save_html(self, timestamp=None, sections=None):
+        """Main method to save the HTML report."""
         if sections is None:
             sections = []
-
-        report_dir = self.report_dir
-        os.makedirs(report_dir, exist_ok=True)
         if timestamp is None:
             timestamp = int(time.time())
 
-        html_filename = os.path.join(report_dir, f"{os.path.splitext(os.path.basename(self.audio_file_name))[0]}_{timestamp}.html")
-        print(f"html students {html_filename}")
+        html_filename = self._generate_html_filename(timestamp)
+        self._create_directory(self.report_dir)
+
         try:
-            # Get absolute file path and encode it for a proper download link
-            abs_file_path = os.path.abspath(self.audio_file_name).replace("\\", "/")
-            encoded_audio_file_path = urllib.parse.quote(abs_file_path)
+            html_content = self._generate_html_content(sections)
+            self._write_to_file(html_filename, html_content)
 
-            # Log the start of the HTML file creation process
-            self.logger.info(f"Creating HTML report for audio file: {self.audio_file_name}")
-            self.logger.info(f"Saving report to: {html_filename}")
-
-            # Write HTML content
-            with open(html_filename, "w") as html_file:
-                html_file.write("<html><head><title>Audio Report</title></head><body>")
-                html_file.write(f"<h1>Audio File: <a href='file://{encoded_audio_file_path}'>Download</a></h1>\n")
-
-                # Write the sections dynamically
-                for section in sections:
-                    section_type = section.get('type', '')
-                    section_id = section.get('id', None)
-                    section_header = section.get('header', '')
-                    section_body = section.get('body', '')
-
-                    self.logger.debug(f"Processing section: {section_id or section_header}")
-
-                    html_file.write(f"<section id='{section_id}'>")
-
-                    # Add section header (if exists)
-                    if section_header:
-                        html_file.write(f"<h2>{section_header}</h2>")
-
-                    # Handle different section types
-                    if section_type == 'toc':
-                        self.logger.debug(f"Rendering Table of Contents with {len(section_body)} items.")
-                        html_file.write("<ul>")
-                        for item in section_body:
-                            html_file.write(f"<li>{item}</li>")
-                        html_file.write("</ul>")
-
-                    elif section_type == 'text':
-                        # Render simple text content
-                        html_file.write(f"<p>{section_body}</p>")
-
-                    elif section_type == 'audio':
-                        # Render the audio player
-                        html_file.write(section_body)
-
-                    elif section_type == 'chunks':
-                        # Render chunks dynamically
-                        self.logger.debug(f"Rendering {len(section_body)} chunks.")
-                        for idx, chunk in enumerate(section_body):
-                            html_file.write(chunk)
-                    else:
-                        # Fallback: Render unknown types as plain text
-                        html_file.write(f"<p>{section_body}</p>")
-
-                    html_file.write("</section>")
-
-                html_file.write("</body></html>")
-
-            # Log successful saving of the HTML file
-            self.logger.info(f"HTML report successfully saved: {html_filename}")
-
-            # Open the HTML file after saving (if enabled)
             if self.open_report_after_save:
-                self.logger.info(f"Opening HTML file: {html_filename}")
-                os.system(f'open "{html_filename}"')
+                self._open_html_file(html_filename)
 
         except Exception as e:
-            # Log the error
             self.logger.error(f"Failed to save HTML file: {e}")
             raise
+
+        self.logger.info(f"HTML report saved to: {html_filename}")
+
+    def _generate_html_filename(self, timestamp):
+        """Generate the HTML file name based on the audio file and timestamp."""
+        base_name = os.path.splitext(os.path.basename(self.audio_file_name))[0]
+        return os.path.join(self.report_dir, f"{base_name}_{timestamp}.html")
+
+    @staticmethod
+    def _create_directory(directory):
+        """Ensure the directory exists."""
+        os.makedirs(directory, exist_ok=True)
+
+    def _generate_html_content(self, sections):
+        """Generate the full HTML content as a string."""
+        self.logger.info(f"Creating HTML content for sections.")
+        header = self._generate_html_header()
+        body = self._generate_html_body(sections)
+        return f"{header}{body}</html>"
+
+    def _generate_html_header(self):
+        """Generate the HTML header including JavaScript for copy functionality."""
+        return """
+        <html>
+        <head>
+            <title>Audio Report</title>
+            <script>
+                function copyToClipboard(elementId) {
+                    const text = document.getElementById(elementId).innerText;
+                    navigator.clipboard.writeText(text).then(() => {
+                        alert('Copied to clipboard!');
+                    }).catch(err => {
+                        alert('Failed to copy: ' + err);
+                    });
+                }
+            </script>
+        </head>
+        <body>
+        """
+
+    def _generate_html_body(self, sections):
+        """Generate the HTML body by processing sections."""
+        body = [self._generate_audio_file_section()]
+        for section in sections:
+            body.append(self._generate_section(section))
+        return "\n".join(body)
+
+    def _generate_audio_file_section(self):
+        """Generate the audio file download section."""
+        abs_file_path = os.path.abspath(self.audio_file_name).replace("\\", "/")
+        encoded_audio_file_path = urllib.parse.quote(abs_file_path)
+        return f"<h1>Audio File: <a href='file://{encoded_audio_file_path}'>Download</a></h1>"
+
+    def _generate_section(self, section):
+        """Generate an individual section based on its type."""
+        section_id = section.get('id', '')
+        section_header = section.get('header', '')
+        section_type = section.get('type', '')
+        section_body = section.get('body', '')
+
+        self.logger.debug(f"Processing section: {section_id or section_header}")
+        section_html = f"<section id='{section_id}'>"
+        if section_header:
+            section_html += f"<h2>{section_header}</h2>"
+
+        if section_type == 'toc':
+            section_html += self._generate_toc(section_body)
+        elif section_type == 'text':
+            section_html += self._generate_text(section_id, section_body)
+        elif section_type == 'audio':
+            section_html += section_body
+        elif section_type == 'chunks':
+            section_html += self._generate_chunks(section_body)
+        else:
+            section_html += f"<p>{section_body}</p>"
+
+        section_html += "</section>"
+        return section_html
+
+    def _generate_toc(self, items):
+        """Generate a Table of Contents section."""
+        self.logger.debug(f"Rendering Table of Contents with {len(items)} items.")
+        return "<ul>" + "".join(f"<li>{item}</li>" for item in items) + "</ul>"
+
+    def _generate_text(self, section_id, text):
+        """Generate a text section with a copy button."""
+        element_id = f"text_{section_id}"
+        return f"""
+        <p id='{element_id}'>{text}</p>
+        <button onclick="copyToClipboard('{element_id}')">Copy</button>
+        """
+
+    def _generate_chunks(self, chunks):
+        """Generate HTML for chunks with copy buttons."""
+        self.logger.debug(f"Rendering {len(chunks)} chunks.")
+        html_chunks = []
+        for idx, chunk in enumerate(chunks):
+            chunk_id = f"chunk_{idx + 1}"
+            html_chunks.append(f"""
+            <div id='{chunk_id}'>{chunk}</div>
+            <button onclick="copyToClipboard('{chunk_id}')">Copy</button>
+            """)
+        return "\n".join(html_chunks)
+
+    @staticmethod
+    def _write_to_file(filename, content):
+        """Write the HTML content to a file."""
+        with open(filename, "w") as file:
+            file.write(content)
+
+    @staticmethod
+    def _open_html_file(filename):
+        """Open the HTML file using the system's default browser."""
+        os.system(f'open "{filename}"')
 
 def seconds_to_hms(seconds):
     return str(timedelta(seconds=seconds))[:8]
