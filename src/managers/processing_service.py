@@ -3,6 +3,8 @@ from .reporting_manager import ReportingManager
 from .transcription_manager import TranscriptionManager
 import os
 import spacy
+import time
+from datetime import timedelta
 
 class ProcessingService:
     def __init__(self, config):
@@ -103,3 +105,39 @@ class ProcessingService:
             word_timestamps= self.transcription_manager.word_timestamps,
              )
 
+
+    def save_raw_transcription(self, text_filename=None, timestamp=None):
+        """Saves the transcription and timestamps to a text file."""
+        if not hasattr(self.transcription_manager, 'transcription') or not hasattr(self.transcription_manager, 'word_timestamps'):
+            self.logger.error("Transcription or word timestamps are missing. Run 'transcribe_audio' first.")
+
+        # Ensure the report directory exists
+        report_dir = self.report_dir
+        os.makedirs(report_dir, exist_ok=True)
+
+        # Generate a timestamp if not provided
+        if timestamp is None:
+            timestamp = int(time.time())
+
+        # Create the filename using the logic
+        if text_filename is None:
+            text_filename = os.path.join(
+                report_dir,
+                f"{os.path.splitext(os.path.basename(self.audio_file_name))[0]}_{timestamp}.txt"
+            )
+        
+        # Save the transcription and timestamps to the file
+        with open(text_filename, 'w', encoding='utf-8') as file:
+            # Write the transcription text
+            file.write("Transcription:\n")
+            file.write(self.transcription_manager.transcription + "\n\n")
+            
+            # Write the timestamps with corresponding text chunks
+            file.write("Timestamps:\n")
+            for segment in self.transcription_manager.word_timestamps:
+                
+                start_hms = str(timedelta(seconds=segment['start']))[:8]
+                end_hms = str(timedelta(seconds=segment['end']))[:8]
+                file.write(f"Start: {start_hms}, End: {end_hms}, Text: {segment['text']}\n")
+
+        print(f"Transcription and timestamps saved to {text_filename}")

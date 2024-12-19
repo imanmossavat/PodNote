@@ -42,6 +42,7 @@ def main():
         # Step 5: Process the audio through the UI manager
         ui_manager.process_audio()
         ui_manager.transcribe()
+        ui_manager.save_raw_transcription()
         ui_manager.report()
     
     except Exception as e:

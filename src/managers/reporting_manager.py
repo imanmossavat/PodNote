@@ -56,10 +56,11 @@ class ReportingManager:
 
         # Split text into chunks while respecting sentence boundaries and token limits
         chunks = self.chunk_formatter.split_text_into_chunks(word_timestamps)
+        formatted_chunks= self.chunk_formatter.format_chunks_as_html(chunks)
 
         # Generate Table of Contents
         toc_body = [
-            f"<a href='#chunk_{idx + 1}'>Chunk {idx + 1} ({self.report_saver.seconds_to_hms(start_time)}-{self.report_saver.seconds_to_hms(end_time)})</a>"
+            f"<a href='#chunk_{idx + 1}'>Chunk {idx + 1} ({seconds_to_hms(start_time)}-{seconds_to_hms(end_time)})</a>"
             for idx, (_, start_time, end_time) in enumerate(chunks)
         ]
 
@@ -87,7 +88,7 @@ class ReportingManager:
                 'type': 'chunks',
                 'id': 'chunks',
                 'header': 'Audio Chunks',
-                'body': ''  # Body left empty; chunks will be dynamically rendered by HTMLSaver
+                'body': formatted_chunks  
             }
         ]
 
@@ -95,7 +96,7 @@ class ReportingManager:
 
         # Save the report in the chosen format (HTML or Markdown)
         if self.report_format == 'html':
-            self.report_saver.save_html(chunks, timestamp=timestamp, sections=sections)
+            self.report_saver.save_html(timestamp=timestamp, sections=sections)
         else:
             self.report_saver.save_markdown(chunks, timestamp=timestamp)
 
@@ -190,6 +191,22 @@ class ChunkFormatter:
             chunks.append((current_chunk, current_start_time, current_end_time))
 
         return chunks
+    
+    def format_chunks_as_html(self, chunks):
+        """Formats the chunks into an HTML string."""
+        formatted_chunks = []
+        for idx, (chunk, start_time, end_time) in enumerate(chunks):
+            start_hms = seconds_to_hms(start_time)
+            end_hms = seconds_to_hms(end_time)
+            chunk_html = f"""
+                <h3 id='chunk_{idx + 1}'>Chunk {idx + 1}</h3>
+                <p><strong>Start:</strong> {start_hms}, <strong>End:</strong> {end_hms}</p>
+                <p>{' '.join(chunk)}</p>
+                <hr>
+            """
+            formatted_chunks.append(chunk_html)
+        return formatted_chunks
+
 
     
 
@@ -224,8 +241,8 @@ class MarkdownSaver:
 
                 # Write ToC with chunk start time links
                 for idx, (chunk, start_time, end_time) in enumerate(chunks):
-                    start_hms = self.seconds_to_hms(start_time)
-                    end_hms = self.seconds_to_hms(end_time)
+                    start_hms = seconds_to_hms(start_time)
+                    end_hms = seconds_to_hms(end_time)
                     chunk_label = f"Chunk {idx + 1} ({start_hms}-{end_hms})"
                     chunk_link = f"[[#Chunk {idx + 1}|{chunk_label}]]"
                     md_file.write(f"- {chunk_link}\n")
@@ -242,8 +259,8 @@ class MarkdownSaver:
 
                 # Add the chunk details
                 for idx, (chunk, start_time, end_time) in enumerate(chunks):
-                    start_hms = self.seconds_to_hms(start_time)
-                    end_hms = self.seconds_to_hms(end_time)
+                    start_hms = seconds_to_hms(start_time)
+                    end_hms = seconds_to_hms(end_time)
                     md_file.write(f"### Chunk {idx + 1}\n")
                     md_file.write(f"**Start:** {start_hms}, **End:** {end_hms}\n\n")
                     md_file.write(f"{' '.join(chunk)}\n\n")
@@ -256,11 +273,6 @@ class MarkdownSaver:
         except Exception as e:
             print(f"Failed to save markdown file: {e}")
 
-    def seconds_to_hms(self, seconds):
-        return str(timedelta(seconds=seconds))[:8]
-
-
-
 
 class HTMLSaver:
     def __init__(self, report_dir, audio_file_name, open_report_after_save=False, logger=None):
@@ -269,7 +281,7 @@ class HTMLSaver:
         self.open_report_after_save = open_report_after_save
         self.logger = logger or logging.getLogger(__name__)  # Use provided logger, or create a default logger
 
-    def save_html(self, chunks, timestamp=None, sections=None):
+    def save_html(self, timestamp=None, sections=None):
         if sections is None:
             sections = []
 
@@ -327,15 +339,9 @@ class HTMLSaver:
 
                     elif section_type == 'chunks':
                         # Render chunks dynamically
-                        self.logger.debug(f"Rendering {len(chunks)} chunks.")
-                        for idx, (chunk, start_time, end_time) in enumerate(chunks):
-                            start_hms = self.seconds_to_hms(start_time)
-                            end_hms = self.seconds_to_hms(end_time)
-                            html_file.write(f"<h3 id='chunk_{idx + 1}'>Chunk {idx + 1}</h3>")
-                            html_file.write(f"<p><strong>Start:</strong> {start_hms}, <strong>End:</strong> {end_hms}</p>")
-                            html_file.write("<p>" + " ".join(chunk) + "</p>")
-                            html_file.write("<hr>")
-
+                        self.logger.debug(f"Rendering {len(section_body)} chunks.")
+                        for idx, chunk in enumerate(section_body):
+                            html_file.write(chunk)
                     else:
                         # Fallback: Render unknown types as plain text
                         html_file.write(f"<p>{section_body}</p>")
@@ -357,5 +363,5 @@ class HTMLSaver:
             self.logger.error(f"Failed to save HTML file: {e}")
             raise
 
-    def seconds_to_hms(self, seconds):
-        return str(timedelta(seconds=seconds))[:8]
+def seconds_to_hms(seconds):
+    return str(timedelta(seconds=seconds))[:8]

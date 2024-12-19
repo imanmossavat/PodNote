@@ -1,7 +1,6 @@
 # src/managers/transcription_manager.py
 import os
 import sys
-
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
 print(root_dir)
 sys.path.append(root_dir)
@@ -9,7 +8,7 @@ sys.path.append(root_dir)
 import whisper
 
 class TranscriptionManager:
-    def __init__(self, logger, transcription_model_name, device, prompt=None):
+    def __init__(self, logger, transcription_model_name, device, prompt=None, report_dir=None, audio_file_name= None):
         self.logger = logger
         self.transcription_model_name= transcription_model_name
         self.device= device
@@ -18,6 +17,8 @@ class TranscriptionManager:
         self.transcription = None
         self.word_timestamps = None
         self.prompt= prompt
+        self.report_dir= report_dir
+        self.audio_file_name= audio_file_name
         
     def load_model(self):
         """Loads the Whisper model."""
@@ -46,3 +47,4 @@ class TranscriptionManager:
         
         self.transcription = result['text']
         self.word_timestamps = result['segments']
+

@@ -62,3 +62,9 @@ class UIManager:
         except Exception as e:
             self.logger.error(f"Error generating report: {e}")
             raise
+
+
+    def save_raw_transcription(self, text_filename=None, timestamp=None):
+        self.processing_service.save_raw_transcription(
+            text_filename=text_filename,
+            timestamp=timestamp)
