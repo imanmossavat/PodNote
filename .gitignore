@@ -8,4 +8,6 @@ docs/issues.txt
 *.html
 *.md
 *.txt
-
+text8
+experiments/wrdvecs.bin
+experiments/HowTo.ipynb
