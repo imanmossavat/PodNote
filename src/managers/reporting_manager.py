@@ -307,6 +307,7 @@ class HTMLSaver:
             raise
 
         self.logger.info(f"HTML report saved to: {html_filename}")
+        print(f"HTML report saved to: {html_filename}")
 
     def _generate_html_filename(self, timestamp):
         """Generate the HTML file name based on the audio file and timestamp."""
