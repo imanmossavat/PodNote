@@ -28,6 +28,7 @@ class ProcessingService:
         self.user_highlight_keywords= config.nlp['user_highlight_keywords']
         self.filler_words_removed=config.nlp['filler_words_removed']
         self.open_report_after_save = config.general['open_report_after_save']
+        self.summary_ratio = config.nlp['summary_ratio']
 
         self.audio_manager = AudioManager(logger= self.logger, target_sample_rate= self.target_sample_rate)
         
@@ -46,7 +47,8 @@ class ProcessingService:
                                                   chunk_size= self.chunk_size,
                                                   report_dir= self.report_dir,
                                                   audio_file_name= self.audio_file_name,
-                                                  report_format= self.report_format)
+                                                  report_format= self.report_format,
+                                                  summary_ratio= self.summary_ratio)
 
     def update_config(self, config):
         self.report_dir = config.directories['report_dir']

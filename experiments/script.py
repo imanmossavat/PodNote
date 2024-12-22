@@ -7,6 +7,7 @@ root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
 sys.path.append(root_dir)
 
 #sys.argv= ['script.py', r"YOURFILE"]
+sys.argv= ['script.py', r"C:\Users\imanm\OneDrive\Documents\podcast\dastani\retake\Promo\snippet_dastani_2_power_assymetry.wav"]
 
 from src import Config, UIManager
 def main():

@@ -1,22 +1,52 @@
+"""
+This script processes an audio transcription and generates reports in either HTML or Markdown format. The report includes a summary, table of contents, audio player, and chunked content of the transcription with timestamps.
+
+Classes:
+1. **ReportingManager**: Manages the entire reporting process. It initializes necessary services and handles report creation, saving, and format handling.
+2. **NLPService**: Responsible for processing the transcription. It extracts critical sentences, highlights them, and generates summaries. It also creates a table of contents for the transcription.
+3. **AudioFileHandler**: Handles the generation of HTML audio player components and manages audio file paths.
+4. **ChunkFormatter**: Splits the transcription into manageable chunks, ensuring no chunk exceeds the specified token size. It also formats these chunks into HTML for report generation.
+5. **MarkdownSaver**: Saves the generated report in Markdown format. It handles file saving, link generation, and adds the audio player in the markdown.
+6. **HTMLSaver**: Saves the generated report in HTML format. It manages file saving, generates the HTML content, and includes an audio player and sections such as summary, chunks, and table of contents.
+
+Functions:
+- **seconds_to_hms**: Converts seconds to a 'HH:MM:SS' format for displaying timestamps.
+
+Architecture:
+- **ReportingManager** orchestrates the entire process, using instances of `NLPService`, `AudioFileHandler`, `ChunkFormatter`, and either `HTMLSaver` or `MarkdownSaver` based on the user’s report format preference.
+- The `NLPService` handles natural language processing tasks such as summarization and highlighting critical sentences in both the transcription and word timestamps.
+- The `ChunkFormatter` splits the transcription into chunks to ensure they are within a manageable size for the report.
+- The `AudioFileHandler` generates HTML audio player components for embedding in the report.
+- Finally, the report is saved either in HTML or Markdown format depending on the selected report format.
+
+This design enables flexibility in generating customized reports from audio transcriptions, with the ability to specify report format and chunk size.
+"""
+
 import os
 import time
 from datetime import timedelta
-import re
-from collections import Counter
 import urllib.parse  # This is for encoding the file paths properly
-
 import logging
+#
+import re
+from sumy.parsers.plaintext import PlaintextParser
+from sumy.summarizers.text_rank import TextRankSummarizer
+from sumy.nlp.tokenizers import Tokenizer
+import nltk
+nltk.download('punkt')
+
 
 
 class ReportingManager:
     def __init__(self, logger, spacy_model, user_highlight_keywords,
-                 filler_words_removed, chunk_size, report_dir=None, audio_file_name=None, open_report_after_save=False, report_format=None):
+                 filler_words_removed, chunk_size, summary_ratio, report_dir=None, audio_file_name=None, open_report_after_save=False, report_format=None):
         self.logger = logger
         self.report_dir = report_dir
         self._audio_file_name = audio_file_name
         self.open_report_after_save = open_report_after_save
         self.report_format = report_format
-        self.nlp_service = NLPService(spacy_model, user_highlight_keywords, filler_words_removed)
+        self.summary_ratio= summary_ratio
+        self.nlp_service = NLPService(spacy_model, user_highlight_keywords, filler_words_removed, self.summary_ratio)
         self.audio_handler = AudioFileHandler(audio_file_name)
         self.chunk_formatter = ChunkFormatter(spacy_model, chunk_size)
 
@@ -39,26 +69,23 @@ class ReportingManager:
         self.audio_handler.audio_file_name = new_audio_file_name
         self.report_saver.audio_file_name = new_audio_file_name
         self.logger.info(f"Audio file name updated to: {new_audio_file_name}")
-  
+    
     def report(self, transcription, word_timestamps):
         audio_file_name = self.audio_file_name
         self.logger.info("Generating report for audio file: %s", audio_file_name)
 
-        # Process transcription and extract keywords
-        updated_transcription, keywords = self.nlp_service.extract_keywords(transcription)
-        self.logger.info(f"Top keywords: {keywords}")
+        # Process transcription using NLPService
+        nlp_results = self.nlp_service.process_transcription(transcription, word_timestamps)
 
-        # Highlight keywords in the transcription
-        highlighted_transcription = self.nlp_service.highlight_keywords(updated_transcription)
-
-        # Format filler words
-        formatted_text = self.nlp_service.format_filler_text(highlighted_transcription)
+        # Extract results from NLPService processing
+        critical_sentences = nlp_results['summary']
+        highlighted_word_timestamps = nlp_results['highlighted_word_timestamps']
 
         # Split text into chunks while respecting sentence boundaries and token limits
-        chunks = self.chunk_formatter.split_text_into_chunks(word_timestamps)
-        formatted_chunks= self.chunk_formatter.format_chunks_as_html(chunks)
+        chunks = self.chunk_formatter.split_text_into_chunks(highlighted_word_timestamps)
+        formatted_chunks = self.chunk_formatter.format_chunks_as_html(chunks)
 
-        # Generate Table of Contents
+        # Generate Table of Contents for chunks
         toc_body = [
             f"<a href='#chunk_{idx + 1}'>Chunk {idx + 1} ({seconds_to_hms(start_time)}-{seconds_to_hms(end_time)})</a>"
             for idx, (_, start_time, end_time) in enumerate(chunks)
@@ -70,25 +97,31 @@ class ReportingManager:
                 'type': 'text',
                 'id': 'summary',
                 'header': 'Summary',
-                'body': 'This is an auto-generated summary of the audio file.'
+                'body': 'This is an auto-generated summary of the audio file.'  # Placeholder for the general summary
             },
             {
                 'type': 'audio',
                 'id': 'audio_player',
                 'header': 'Audio Player',
-                'body': AudioFileHandler(self.audio_file_name).generate_audio_player_html()
+                'body': AudioFileHandler(audio_file_name).generate_audio_player_html()
             },
             {
                 'type': 'toc',
                 'id': 'toc',
                 'header': 'Table of Contents',
-                'body': toc_body  # Table of Contents with clickable links
+                'body': toc_body  # Table of Contents with clickable links for chunks
             },
             {
                 'type': 'chunks',
                 'id': 'chunks',
                 'header': 'Audio Chunks',
-                'body': formatted_chunks  
+                'body': formatted_chunks  # Chunks formatted as HTML, with bolded critical sentences
+            },
+            {
+                'type': 'text',
+                'id': 'extractive_summary',
+                'header': 'Extractive Summary',
+                'body': "\n".join(critical_sentences)  # The critical sentences summary
             }
         ]
 
@@ -101,38 +134,76 @@ class ReportingManager:
             self.report_saver.save_markdown(chunks, timestamp=timestamp)
 
 
-
+ 
 class NLPService:
-    def __init__(self, spacy_model, user_highlight_keywords, filler_words_removed):
+    def __init__(self, spacy_model, user_highlight_keywords, filler_words_removed, summary_ratio=None):
         self.spacy_model = spacy_model
         self.user_highlight_keywords = user_highlight_keywords
         self.filler_words_removed = filler_words_removed
+        self.summary_ratio = summary_ratio  # Default ratio for summarization
 
-    def extract_keywords(self, transcript, top_m=10):
-        doc = self.spacy_model(transcript)
-        stop_words = set(["hello", "hi", "um", "uh", "like", "okay", "well", 'today', "thing", "things", "kind"])
-        keywords = [token.text for token in doc if token.pos_ in ['NOUN', 'PROPN'] and token.text.lower() not in stop_words]
-        keyword_counts = Counter(keywords)
-        top_keywords = keyword_counts.most_common(top_m)
-        formatted_keywords = [f"**{kw[0]}**: {kw[1]}" for kw in top_keywords]
-        updated_transcript = "\n".join(formatted_keywords) + "\n\n" + transcript
-        return updated_transcript, [kw[0] for kw in top_keywords]
+    def _highlight_critical_sentences(self, transcription, critical_sentences):
+        """Apply bold formatting to the critical sentences in the transcription."""
+        for sentence in critical_sentences:
+            transcription = transcription.replace(sentence, f"**{sentence}**")
+        return transcription
 
-    def highlight_keywords(self, transcript):
-        for keyword in self.user_highlight_keywords:
-            transcript = re.sub(f"({keyword})", r"**\1**", transcript, flags=re.IGNORECASE)
-        return transcript
+    def _apply_highlighted_to_word_timestamps(self, word_timestamps, critical_sentences):
+        """Apply bold formatting to critical sentences within word_timestamps."""
+        for sentence in critical_sentences:
+            words_in_sentence = sentence.split()  # Splitting sentence into words
+            sentence_str = " ".join(words_in_sentence)  # Recreating sentence
+            for word in word_timestamps:
+                if word['text'] in sentence_str:
+                    word['text'] = f"**{word['text']}**"
+        return word_timestamps
 
-    def format_filler_text(self, text):
-        for word in self.filler_words_removed:
-            text = text.replace(f" {word} ", f" <span style='color: red;'>{word}</span> ")
-        return text
-    
+    def _extract_summary(self, text):
+        """Extract a summary using TextRank."""
+        try:
+            sentences = nltk.sent_tokenize(text)
+            sentence_count = len(sentences)
+            tokenizer = Tokenizer("english")
+            parser = PlaintextParser.from_string(text, tokenizer)
+            summarizer = TextRankSummarizer()
+            summary_count = max(1, int(sentence_count * self.summary_ratio))
+            summary = summarizer(parser.document, sentences_count=summary_count)
+            summary = [str(sentence) for sentence in summary]
+        except ValueError:
+            summary = text.split()[:2]
+        return summary
+
     def generate_table_of_contents(self, transcript):
+        """Generate a Markdown Table of Contents from transcript headings."""
         lines = transcript.split("\n")
         toc = [line.strip() for line in lines if line.startswith("#")]
         toc_md = "\n".join([f"- [{heading}](#{heading.replace(' ', '-').lower()})" for heading in toc])
         return toc_md
+
+    def process_transcription(self, transcription, word_timestamps):
+        """Process the transcription to generate summaries, highlight sentences, and format chunks."""
+        # Clean transcription for summarization
+        cleaned_transcription = re.sub(r'\s+', ' ', transcription).strip()
+
+        # Generate extractive summary from the cleaned transcription
+        critical_sentences = self._extract_summary(cleaned_transcription)
+
+        # Highlight critical sentences in the original transcription (not cleaned)
+        highlighted_transcription = self._highlight_critical_sentences(transcription, critical_sentences)
+
+        # Apply highlights to word timestamps
+        highlighted_word_timestamps = self._apply_highlighted_to_word_timestamps(word_timestamps, critical_sentences)
+
+        # Generate Table of Contents (from original transcription)
+        toc = self.generate_table_of_contents(transcription)
+
+        return {
+            "summary": critical_sentences,
+            "highlighted_transcription": highlighted_transcription,
+            "highlighted_word_timestamps": highlighted_word_timestamps,
+            "table_of_contents": toc
+        }
+
 
 class AudioFileHandler:
     def __init__(self, audio_file_name):

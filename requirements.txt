@@ -3,3 +3,5 @@ torch
 spacy
 whisper
 webbrowser
+sumy
+nltk

@@ -74,7 +74,8 @@ class Config:
         
         self.nlp = {'spacy_model':"en_core_web_sm",
                     'user_highlight_keywords': [],
-                    'filler_words_removed': ["um", "uh", "like"]
+                    'filler_words_removed': ["um", "uh", "like"],
+                    'summary_ratio': 0.05 # extractive summary by textrank
         }
 
     def get_full_prompt(self):
