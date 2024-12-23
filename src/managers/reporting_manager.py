@@ -34,6 +34,7 @@ from sumy.summarizers.text_rank import TextRankSummarizer
 from sumy.nlp.tokenizers import Tokenizer
 import nltk
 nltk.download('punkt')
+from transformers import T5Tokenizer, T5ForConditionalGeneration
 
 
 
@@ -69,7 +70,7 @@ class ReportingManager:
         self.audio_handler.audio_file_name = new_audio_file_name
         self.report_saver.audio_file_name = new_audio_file_name
         self.logger.info(f"Audio file name updated to: {new_audio_file_name}")
-    
+        
     def report(self, transcription, word_timestamps):
         audio_file_name = self.audio_file_name
         self.logger.info("Generating report for audio file: %s", audio_file_name)
@@ -83,6 +84,14 @@ class ReportingManager:
 
         # Split text into chunks while respecting sentence boundaries and token limits
         chunks = self.chunk_formatter.split_text_into_chunks(highlighted_word_timestamps)
+
+        # Generate summaries for each chunk using T5-small
+        chunk_summaries = self.nlp_service.summarize_chunks(chunks)
+
+        # Aggregate chunk summaries into a section summary
+        section_summary = " ".join(chunk_summaries)
+
+        # Format chunks with highlighted sentences
         formatted_chunks = self.chunk_formatter.format_chunks_as_html(chunks, critical_sentences)
 
         # Generate Table of Contents for chunks
@@ -97,7 +106,7 @@ class ReportingManager:
                 'type': 'text',
                 'id': 'summary',
                 'header': 'Summary',
-                'body': 'This is an auto-generated summary of the audio file.'  # Placeholder for the general summary
+                'body': section_summary  # Aggregated summary of all chunks
             },
             {
                 'type': 'audio',
@@ -203,6 +212,32 @@ class NLPService:
             "highlighted_word_timestamps": highlighted_word_timestamps,
             "table_of_contents": toc
         }
+    
+    def summarize_chunks(self, chunks):
+        """
+        Summarize each chunk using T5-small and return a list of summaries.
+
+        Args:
+            chunks (list): List of transcription chunks, each with text and timestamps.
+
+        Returns:
+            list: List of summaries, one for each chunk.
+        """
+
+        # Load the T5-small model and tokenizer
+        tokenizer = T5Tokenizer.from_pretrained("t5-small")
+        model = T5ForConditionalGeneration.from_pretrained("t5-small")
+
+        summaries = []
+        for chunk_text, start_time, end_time in chunks:
+            input_text = "summarize: " + " ".join(chunk_text)
+            input_ids = tokenizer.encode(input_text, return_tensors="pt", max_length=512, truncation=True)
+            output_ids = model.generate(input_ids, max_length=150, min_length=30, length_penalty=2.0, num_beams=4, early_stopping=True)
+            summary = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+            summaries.append(summary)
+
+        return summaries
+
 
 
 class AudioFileHandler:
