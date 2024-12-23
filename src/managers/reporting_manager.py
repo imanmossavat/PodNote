@@ -83,7 +83,7 @@ class ReportingManager:
 
         # Split text into chunks while respecting sentence boundaries and token limits
         chunks = self.chunk_formatter.split_text_into_chunks(highlighted_word_timestamps)
-        formatted_chunks = self.chunk_formatter.format_chunks_as_html(chunks)
+        formatted_chunks = self.chunk_formatter.format_chunks_as_html(chunks, critical_sentences)
 
         # Generate Table of Contents for chunks
         toc_body = [
@@ -268,20 +268,28 @@ class ChunkFormatter:
         return chunks
 
     
-    def format_chunks_as_html(self, chunks):
-        """Formats the chunks into an HTML string."""
+    def format_chunks_as_html(self, chunks, critical_sentences):
+        """Formats the chunks into an HTML string, with critical sentences highlighted."""
         formatted_chunks = []
         for idx, (chunk, start_time, end_time) in enumerate(chunks):
             start_hms = seconds_to_hms(start_time)
             end_hms = seconds_to_hms(end_time)
+            
+            # Highlight critical sentences within the chunk
+            highlighted_chunk = " ".join(chunk)
+            for sentence in critical_sentences:
+                highlighted_chunk = highlighted_chunk.replace(sentence, f"<b>{sentence}</b>")
+            
+            # Format the chunk as HTML
             chunk_html = f"""
                 <h3 id='chunk_{idx + 1}'>Chunk {idx + 1}</h3>
                 <p><strong>Start:</strong> {start_hms}, <strong>End:</strong> {end_hms}</p>
-                <p>{' '.join(chunk)}</p>
+                <p>{highlighted_chunk}</p>
                 <hr>
             """
             formatted_chunks.append(chunk_html)
         return formatted_chunks
+
 
 
     
