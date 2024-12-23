@@ -4,7 +4,7 @@ This script processes an audio transcription and generates reports in either HTM
 Classes:
 1. **ReportingManager**: Manages the entire reporting process. It initializes necessary services and handles report creation, saving, and format handling.
 2. **NLPService**: Responsible for processing the transcription. It extracts critical sentences, highlights them, and generates summaries. It also creates a table of contents for the transcription.
-3. **AudioFileHandler**: Handles the generation of HTML audio player components and manages audio file paths.
+3. **AudioPlayer**: Handles the generation of HTML audio player components and manages audio file paths.
 4. **ChunkFormatter**: Splits the transcription into manageable chunks, ensuring no chunk exceeds the specified token size. It also formats these chunks into HTML for report generation.
 5. **MarkdownSaver**: Saves the generated report in Markdown format. It handles file saving, link generation, and adds the audio player in the markdown.
 6. **HTMLSaver**: Saves the generated report in HTML format. It manages file saving, generates the HTML content, and includes an audio player and sections such as summary, chunks, and table of contents.
@@ -13,10 +13,10 @@ Functions:
 - **seconds_to_hms**: Converts seconds to a 'HH:MM:SS' format for displaying timestamps.
 
 Architecture:
-- **ReportingManager** orchestrates the entire process, using instances of `NLPService`, `AudioFileHandler`, `ChunkFormatter`, and either `HTMLSaver` or `MarkdownSaver` based on the user’s report format preference.
+- **ReportingManager** orchestrates the entire process, using instances of `NLPService`, `AudioPlayer`, `ChunkFormatter`, and either `HTMLSaver` or `MarkdownSaver` based on the user’s report format preference.
 - The `NLPService` handles natural language processing tasks such as summarization and highlighting critical sentences in both the transcription and word timestamps.
 - The `ChunkFormatter` splits the transcription into chunks to ensure they are within a manageable size for the report.
-- The `AudioFileHandler` generates HTML audio player components for embedding in the report.
+- The `AudioPlayer` generates HTML audio player components for embedding in the report.
 - Finally, the report is saved either in HTML or Markdown format depending on the selected report format.
 
 This design enables flexibility in generating customized reports from audio transcriptions, with the ability to specify report format and chunk size.
@@ -48,16 +48,16 @@ class ReportingManager:
         self.report_format = report_format
         self.summary_ratio= summary_ratio
         self.nlp_service = NLPService(spacy_model, user_highlight_keywords, filler_words_removed, self.summary_ratio)
-        self.audio_handler = AudioFileHandler(audio_file_name)
+        self.audio_handler = AudioPlayer(audio_file_name)
         self.chunk_formatter = ChunkFormatter(spacy_model, chunk_size)
 
-        if report_format == 'html':
-            self.report_saver = HTMLSaver(report_dir, audio_file_name, open_report_after_save)
-        elif 'markdown':
-            self.report_saver = MarkdownSaver(report_dir, audio_file_name, open_report_after_save)
-        else:
+        if report_format not in ['markdown', 'html']:
             raise ValueError(f"Unidentified report format: {report_format}")
 
+        if report_format == 'markdown':
+            print('Markdown not supported any longer. Switch to HTML')
+
+        self.report_saver = HTMLSaver(report_dir, audio_file_name, open_report_after_save)
 
 
     @property
@@ -112,7 +112,7 @@ class ReportingManager:
                 'type': 'audio',
                 'id': 'audio_player',
                 'header': 'Audio Player',
-                'body': AudioFileHandler(audio_file_name).generate_audio_player_html()
+                'body': AudioPlayer(audio_file_name).generate_audio_player_html()
             },
             {
                 'type': 'toc',
@@ -229,18 +229,19 @@ class NLPService:
         model = T5ForConditionalGeneration.from_pretrained("t5-small")
 
         summaries = []
-        for chunk_text, start_time, end_time in chunks:
+        for idx, (chunk_text, start_time, end_time) in enumerate(chunks):
             input_text = "summarize: " + " ".join(chunk_text)
             input_ids = tokenizer.encode(input_text, return_tensors="pt", max_length=512, truncation=True)
             output_ids = model.generate(input_ids, max_length=150, min_length=30, length_penalty=2.0, num_beams=4, early_stopping=True)
             summary = tokenizer.decode(output_ids[0], skip_special_tokens=True)
-            summaries.append(summary)
-
+            html_tag= f"[<a href='#chunk_{idx + 1}'>{idx + 1}</a>]"
+            
+            summaries.append(f"[{generate_audio_link(start_time)}]: " + summary+ html_tag)
         return summaries
 
 
 
-class AudioFileHandler:
+class AudioPlayer:
     def __init__(self, audio_file_name):
         self.audio_file_name = audio_file_name
 
@@ -256,6 +257,28 @@ class AudioFileHandler:
                 var audio = document.getElementById('audio_player');
                 audio.currentTime = time;
                 audio.play();
+            }}
+        </script>
+        """
+
+    def generate_audio_player_html(self):
+        # Ensure audio_url is an accessible URL, not a file path
+        audio_url = self.audio_file_name.replace("\\", "/")  # Convert backslashes to forward slashes if needed
+        return f"""
+        <audio id="audio_player" controls>
+            <source src="{audio_url}" type="audio/mpeg">
+            Your browser does not support the audio element.
+        </audio>
+        <script>
+            // Define the playAudioAtTime function globally
+            function playAudioAtTime(time) {{
+                var audio = document.getElementById('audio_player');
+                if (audio) {{
+                    audio.currentTime = time;
+                    audio.play();
+                }} else {{
+                    alert('Audio player not found!');
+                }}
             }}
         </script>
         """
@@ -327,70 +350,6 @@ class ChunkFormatter:
 
 
 
-    
-
-class MarkdownSaver:
-    def __init__(self, report_dir, audio_file_name, open_report_after_save=False):
-        self.report_dir = report_dir
-        self.audio_file_name = audio_file_name
-        self.open_report_after_save = open_report_after_save
-
-    def save_markdown(self, chunks, timestamp=None):
-        report_dir = self.report_dir
-        os.makedirs(report_dir, exist_ok=True)
-        if timestamp is None:
-            timestamp = int(time.time())
-
-        md_filename = os.path.join(report_dir, f"{os.path.splitext(os.path.basename(self.audio_file_name))[0]}_{timestamp}.md")
-
-        try:
-            # Get absolute file path and replace backslashes with forward slashes
-            abs_file_path = os.path.abspath(self.audio_file_name)
-            abs_file_path = abs_file_path.replace("\\", "/")  # Convert backslashes to forward slashes
-
-            # Encode the path
-            encoded_audio_file_path = urllib.parse.quote(abs_file_path)
-
-            # Write markdown content
-            with open(md_filename, "w") as md_file:
-                # Use the encoded path for the audio file link
-                md_file.write(f"[Audio File](file://{encoded_audio_file_path})\n\n")
-                md_file.write("---\n\n")
-                md_file.write("# Table of Contents\n")
-
-                # Write ToC with chunk start time links
-                for idx, (chunk, start_time, end_time) in enumerate(chunks):
-                    start_hms = seconds_to_hms(start_time)
-                    end_hms = seconds_to_hms(end_time)
-                    chunk_label = f"Chunk {idx + 1} ({start_hms}-{end_hms})"
-                    chunk_link = f"[[#Chunk {idx + 1}|{chunk_label}]]"
-                    md_file.write(f"- {chunk_link}\n")
-                md_file.write("\n---\n\n")
-
-                md_file.write("# Keywords\n")
-                md_file.write("List any extracted or user-defined keywords here.\n\n")
-                md_file.write("---\n\n")
-
-                # Add audio player to markdown
-                audio_player_html = AudioFileHandler(self.audio_file_name).generate_audio_player_html()
-                md_file.write(f"{audio_player_html}\n\n")
-                md_file.write("---\n\n")
-
-                # Add the chunk details
-                for idx, (chunk, start_time, end_time) in enumerate(chunks):
-                    start_hms = seconds_to_hms(start_time)
-                    end_hms = seconds_to_hms(end_time)
-                    md_file.write(f"### Chunk {idx + 1}\n")
-                    md_file.write(f"**Start:** {start_hms}, **End:** {end_hms}\n\n")
-                    md_file.write(f"{' '.join(chunk)}\n\n")
-                    md_file.write("---\n\n")
-
-            if self.open_report_after_save:
-                os.system(f'open "{md_filename}"')
-            print(f"\nMarkdown file saved: {md_filename}\n")
-
-        except Exception as e:
-            print(f"Failed to save markdown file: {e}")
 
 class HTMLSaver:
     def __init__(self, report_dir, audio_file_name, open_report_after_save=False, logger=None):
@@ -537,3 +496,10 @@ class HTMLSaver:
 
 def seconds_to_hms(seconds):
     return str(timedelta(seconds=seconds))[:8]
+
+def generate_audio_link(time_in_seconds, display_text=None):
+    if display_text is None:
+        display_text= seconds_to_hms(time_in_seconds)
+    return f"""<a href="javascript:void(0)" onclick="playAudioAtTime({time_in_seconds})">{display_text}</a>"""
+
+    

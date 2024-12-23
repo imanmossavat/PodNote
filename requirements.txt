@@ -5,3 +5,4 @@ whisper
 webbrowser
 sumy
 nltk
+transformers
