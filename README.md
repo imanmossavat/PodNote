@@ -1,11 +1,11 @@
-# Podcast Audio to Markdown/HTML
+# Podcast Audio to HTML
 
-This project provides a tool to convert podcast audio files into a structured markdown format. It uses speech recognition to transcribe the audio and then formats the output into a markdown file for easier reading and analysis.
+This project provides a tool to convert podcast audio files into a structured markdown format. It uses speech recognition to transcribe the audio and then formats the output into a HTML file for easier reading and analysis.
 
 ## Features
 
 - Converts podcast audio files (e.g., MP3, WAV) to text using **Whisper** (OpenAI’s speech-to-text model).
-- Organizes the transcription into a markdown format for easy use and review.
+- Organizes the transcription into a HTML format for easy use and review.
 - Includes functionality for logging, progress tracking, and error handling.
 
 ## Requirements
