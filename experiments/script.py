@@ -7,7 +7,9 @@ root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
 sys.path.append(root_dir)
 
 #sys.argv= ['script.py', r"YOURFILE"]
-sys.argv= ['script.py', r"C:\Users\imanm\OneDrive\Documents\podcast\robert engels\processed_Robert_Iman Podcast-20241203_090154-Meeting Recording.wav"]
+sys.argv= ['script.py', r"C:\Users\imanm\OneDrive\Documents\podcast\dastani\retake\Promo\snippet_dastani_2_power_assymetry.wav"]
+
+#sys.argv= ['script.py', r"C:\Users\imanm\OneDrive\Documents\podcast\robert engels\processed_Robert_Iman Podcast-20241203_090154-final_v2.wav"]
 
 from src import Config, UIManager
 def main():
@@ -23,9 +25,9 @@ def main():
 
     # Step 2: Set up the configuration (Config) for the system
     config = Config()
-
+    
     config.prompt['filler']=''
-    config.prompt['domain']='Iman Mossavat, \"Iman Mossavat\", Fontys, Eindhoven, Brainport,Capegemini'
+    config.prompt['domain']='Iman Mossavat, \"Iman Mossavat\", \"Mehdi Dastani\", Fontys, Eindhoven, Capegemini'
 
     # Step 3: Initialize the UI Manager (handling user requests and managing interactions)
     ui_manager = UIManager(config)

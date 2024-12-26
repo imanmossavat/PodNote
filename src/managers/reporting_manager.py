@@ -1,26 +1,54 @@
 """
-This script processes an audio transcription and generates reports in either HTML or Markdown format. The report includes a summary, table of contents, audio player, and chunked content of the transcription with timestamps.
+This script processes audio transcriptions and generates reports in HTML format. The report includes:
+- A summary of the transcription.
+- A table of contents with links to sections of the transcription.
+- An embedded audio player for playback.
+- Highlighted chunks of the transcription with timestamps.
+
+Key Features:
+- **Audio Transcription Processing**: Handles natural language processing (NLP) tasks like summarization, highlighting, and chunking.
+- **Report Generation**: Creates HTML reports, including an audio player and formatted sections with clickable links.
+- **Customizable Settings**: Allows users to define chunk size, summary ratio, and highlight keywords.
 
 Classes:
-1. **ReportingManager**: Manages the entire reporting process. It initializes necessary services and handles report creation, saving, and format handling.
-2. **NLPService**: Responsible for processing the transcription. It extracts critical sentences, highlights them, and generates summaries. It also creates a table of contents for the transcription.
-3. **AudioPlayer**: Handles the generation of HTML audio player components and manages audio file paths.
-4. **ChunkFormatter**: Splits the transcription into manageable chunks, ensuring no chunk exceeds the specified token size. It also formats these chunks into HTML for report generation.
-5. **MarkdownSaver**: Saves the generated report in Markdown format. It handles file saving, link generation, and adds the audio player in the markdown.
-6. **HTMLSaver**: Saves the generated report in HTML format. It manages file saving, generates the HTML content, and includes an audio player and sections such as summary, chunks, and table of contents.
+1. **ReportingManager**:
+   - Coordinates the report generation process.
+   - Manages services for transcription processing, chunking, and report saving.
+   - Handles settings for audio file, output format, and report directory.
+2. **NLPService**:
+   - Extracts summaries and highlights critical sentences.
+   - Applies highlighting to transcription text and timestamps.
+   - Uses TextRank and a T5 model for summarization.
+3. **AudioPlayer**:
+   - Generates HTML audio players for embedding in reports.
+   - Provides a JavaScript function to play audio at specific timestamps.
+4. **ChunkFormatter**:
+   - Splits transcriptions into manageable chunks based on token limits.
+   - Formats chunks with critical sentences highlighted.
+5. **HTMLSaver**:
+   - Creates and saves HTML reports.
+   - Supports customizable sections, including summaries, table of contents, and audio chunks.
 
 Functions:
-- **seconds_to_hms**: Converts seconds to a 'HH:MM:SS' format for displaying timestamps.
+- **seconds_to_hms**: Converts seconds into 'HH:MM:SS' format for timestamps.
+- **generate_audio_link**: Creates clickable audio links for specific timestamps in the transcription.
 
-Architecture:
-- **ReportingManager** orchestrates the entire process, using instances of `NLPService`, `AudioPlayer`, `ChunkFormatter`, and either `HTMLSaver` or `MarkdownSaver` based on the user’s report format preference.
-- The `NLPService` handles natural language processing tasks such as summarization and highlighting critical sentences in both the transcription and word timestamps.
-- The `ChunkFormatter` splits the transcription into chunks to ensure they are within a manageable size for the report.
-- The `AudioPlayer` generates HTML audio player components for embedding in the report.
-- Finally, the report is saved either in HTML or Markdown format depending on the selected report format.
+Workflow:
+1. **ReportingManager** initializes and orchestrates the services.
+2. **NLPService** processes the transcription to generate summaries and highlight critical information.
+3. **ChunkFormatter** divides the transcription into chunks and formats them.
+4. **HTMLSaver** compiles the data into an HTML report, embedding the audio player and linking to specific chunks.
 
-This design enables flexibility in generating customized reports from audio transcriptions, with the ability to specify report format and chunk size.
+Dependencies:
+- `nltk` for text tokenization.
+- `transformers` for summarization using the T5 model.
+- `sumy` for extractive summarization with TextRank.
+- `spacy` for text processing.
+- Standard libraries such as `os`, `time`, `logging`, and `re`.
+
+This design provides a structured and modular way to generate informative, interactive reports from audio transcriptions.
 """
+
 
 import os
 import time
@@ -94,25 +122,29 @@ class ReportingManager:
         # Format chunks with highlighted sentences
         formatted_chunks = self.chunk_formatter.format_chunks_as_html(chunks, critical_sentences)
 
+        merged_summaries= self.chunk_formatter.merge_summaries(chunk_summaries, chunks, critical_sentences)
+
         # Generate Table of Contents for chunks
         toc_body = [
             f"<a href='#chunk_{idx + 1}'>Chunk {idx + 1} ({seconds_to_hms(start_time)}-{seconds_to_hms(end_time)})</a>"
             for idx, (_, start_time, end_time) in enumerate(chunks)
         ]
+        toc_body.append("<a href='#extractive_summary'>Extractive Summary</a>")
+        toc_body.append("<a href='#merged_summaries'>Merged Summary</a>")
 
         # Define sections for the report
         sections = [
-            {
-                'type': 'text',
-                'id': 'summary',
-                'header': 'Summary',
-                'body': section_summary  # Aggregated summary of all chunks
-            },
             {
                 'type': 'audio',
                 'id': 'audio_player',
                 'header': 'Audio Player',
                 'body': AudioPlayer(audio_file_name).generate_audio_player_html()
+            },
+            {
+                'type': 'text',
+                'id': 'summary',
+                'header': 'Summary',
+                'body': section_summary  # Aggregated summary of all chunks
             },
             {
                 'type': 'toc',
@@ -131,7 +163,15 @@ class ReportingManager:
                 'id': 'extractive_summary',
                 'header': 'Extractive Summary',
                 'body': "\n".join(critical_sentences)  # The critical sentences summary
+            },
+            {
+                'type': 'text',
+                'id': 'merged_summaries',
+                'header': 'Merged Summary',
+                'body': merged_summaries  # The critical sentences summary
             }
+
+            
         ]
 
         timestamp = int(time.time())
@@ -203,14 +243,10 @@ class NLPService:
         # Apply highlights to word timestamps
         highlighted_word_timestamps = self._apply_highlighted_to_word_timestamps(word_timestamps, critical_sentences)
 
-        # Generate Table of Contents (from original transcription)
-        toc = self.generate_table_of_contents(transcription)
-
         return {
             "summary": critical_sentences,
             "highlighted_transcription": highlighted_transcription,
             "highlighted_word_timestamps": highlighted_word_timestamps,
-            "table_of_contents": toc
         }
     
     def summarize_chunks(self, chunks):
@@ -324,8 +360,36 @@ class ChunkFormatter:
             chunks.append((current_chunk, current_start_time, current_end_time))
 
         return chunks
+            
+    def merge_summaries(self, chunk_summaries, chunks, critical_sentences, Prompt=None):
+        if Prompt is None:
+            Prompt = "Here are abstractive summaries for text chunks of a given length. From each chunk, certain critical sentences were chosen by the abstractive summary process run on the entire document. Use this information to create a summary organized in temporally coherent topics with time stamps:"
 
-    
+        # Start by adding the prompt to the summary (optional)
+        interleaved_summaries = [Prompt]
+
+        for idx, (chunk_summary, (chunk, start_time, end_time)) in enumerate(zip(chunk_summaries, chunks)):
+            interleaved_summaries.append(f"Chunk {idx + 1} ({seconds_to_hms(start_time)}-{seconds_to_hms(end_time)}):")
+            
+            # Abstractive Summary
+            interleaved_summaries.append(f"Abstractive Summary: <pre>{chunk_summary}</pre>")  # Use <pre> for proper formatting
+            
+            # Extractive Summary: Filter relevant sentences
+            extractive_sentences = []
+            highlighted_chunk = " ".join(chunk)  # Convert chunk to a single string
+
+            for sentence in critical_sentences:
+                # Check if sentence is part of the chunk (simple containment check)
+                if sentence in highlighted_chunk:
+                    # Add extracted sentence as a quote in italics
+                    extractive_sentences.append(f"Extracted quote: <i>\"{sentence}\"</i>")
+
+            # Add the relevant extractive summary sentences to the interleaved summaries
+            if extractive_sentences:
+                interleaved_summaries.append("\n".join(extractive_sentences))
+
+        return "\n\n".join(interleaved_summaries)
+
     def format_chunks_as_html(self, chunks, critical_sentences):
         """Formats the chunks into an HTML string, with critical sentences highlighted."""
         formatted_chunks = []
