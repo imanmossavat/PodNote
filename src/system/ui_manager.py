@@ -68,3 +68,16 @@ class UIManager:
         self.processing_service.save_raw_transcription(
             text_filename=text_filename,
             timestamp=timestamp)
+        
+
+    def save_transcription_state(self, state_file):
+        """Save the transcription state to a file."""
+        self.processing_service.transcription_manager.save_state(state_file)
+        self.logger.info(f'state saved to {state_file}')
+
+    def load_transcription_state(self, state_file):
+        """Load the transcription state from a file."""
+        self.processing_service.transcription_manager.load_state(state_file)
+        self.logger.info(f'state loaded from {state_file}')
+
+

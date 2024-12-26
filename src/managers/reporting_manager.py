@@ -103,26 +103,31 @@ class ReportingManager:
         audio_file_name = self.audio_file_name
         self.logger.info("Generating report for audio file: %s", audio_file_name)
 
+        
         # Process transcription using NLPService
-        nlp_results = self.nlp_service.process_transcription(transcription, word_timestamps)
-
-        # Extract results from NLPService processing
-        critical_sentences = nlp_results['summary']
-        highlighted_word_timestamps = nlp_results['highlighted_word_timestamps']
+        critical_sentences, _ , cleaned_word_timestamps = self.nlp_service.process_transcription(transcription, word_timestamps)
+        self.logger.info("text cleaned. ")
+        self.logger.info("extractive summary generated. ")        
 
         # Split text into chunks while respecting sentence boundaries and token limits
-        chunks = self.chunk_formatter.split_text_into_chunks(highlighted_word_timestamps)
+        chunks = self.chunk_formatter.split_text_into_chunks(cleaned_word_timestamps)
+        self.logger.info("Chunks generated. ")        
 
         # Generate summaries for each chunk using T5-small
         chunk_summaries = self.nlp_service.summarize_chunks(chunks)
+        self.logger.info("Chunks summarized (abstractive). ")        
 
         # Aggregate chunk summaries into a section summary
         section_summary = " ".join(chunk_summaries)
 
         # Format chunks with highlighted sentences
         formatted_chunks = self.chunk_formatter.format_chunks_as_html(chunks, critical_sentences)
+        self.logger.info("Chunks formatted as HTML. ")        
+
 
         merged_summaries= self.chunk_formatter.merge_summaries(chunk_summaries, chunks, critical_sentences)
+        self.logger.info("merged summary generated ")        
+
 
         # Generate Table of Contents for chunks
         toc_body = [
@@ -131,6 +136,7 @@ class ReportingManager:
         ]
         toc_body.append("<a href='#extractive_summary'>Extractive Summary</a>")
         toc_body.append("<a href='#merged_summaries'>Merged Summary</a>")
+        self.logger.info("ToC generated ")        
 
         # Define sections for the report
         sections = [
@@ -207,8 +213,17 @@ class NLPService:
                     word['text'] = f"**{word['text']}**"
         return word_timestamps
 
-    def _extract_summary(self, text):
+    def _extract_summary(self, cleaned_word_timestamps):
         """Extract a summary using TextRank."""
+        
+        text = []
+
+        for segment in cleaned_word_timestamps:
+            text.append(segment['text'])
+
+        text = " ".join(text)
+
+
         try:
             sentences = nltk.sent_tokenize(text)
             sentence_count = len(sentences)
@@ -222,32 +237,90 @@ class NLPService:
             summary = text.split()[:2]
         return summary
 
-    def generate_table_of_contents(self, transcript):
-        """Generate a Markdown Table of Contents from transcript headings."""
-        lines = transcript.split("\n")
-        toc = [line.strip() for line in lines if line.startswith("#")]
-        toc_md = "\n".join([f"- [{heading}](#{heading.replace(' ', '-').lower()})" for heading in toc])
-        return toc_md
+    def preprocess_transcription(self, transcription, word_timestamps):
+        cleaned_transcription = self.preprocess_text(transcription)
+        for word in word_timestamps:
+            word['text']= self.preprocess_text(word['text'])
+        return cleaned_transcription, word_timestamps
+
+
+    # Function to preprocess and clean the text
+    def preprocess_text(self, text):
+        # First, perform sentence tokenization to preserve sentence structure
+        sentences = nltk.sent_tokenize(text)
+        # print(f"Sentences before cleaning: {sentences}")  # Diagnostic print
+
+        # Define filler words and repetitive phrases to remove
+        filler_words = ["uh", "um", "yeah", "you know"]
+
+        # Apply preprocessing steps to each sentence
+        cleaned_sentences = []
+        for sentence in sentences:
+            cleaned_sentence = self.remove_filler_words(sentence, filler_words)
+            cleaned_sentence = self.remove_repetitive_phrases(cleaned_sentence)
+            cleaned_sentences.append(cleaned_sentence)
+
+        # Rebuild the text from cleaned sentences
+        cleaned_text = ' '.join(cleaned_sentences)
+        
+        # Normalize whitespace by splitting and joining words
+        cleaned_text = ' '.join(cleaned_text.split())
+        return cleaned_text
+
+    # Function to remove filler words manually (without regex)
+    def remove_filler_words(self, text, filler_words):
+        # Normalize the text by removing punctuation before checking for filler words
+        words = text.split()
+        filtered_words = []
+        for word in words:
+            # Remove punctuation from the word for comparison
+            clean_word = re.sub(r'[^\w\s]', '', word).lower()  # Remove non-alphanumeric characters
+            # print(f"Checking word: '{word}' (cleaned: '{clean_word}')")  # Diagnostic print
+            
+            # Check if the word (after cleaning) is a filler word
+            if clean_word not in filler_words:
+                filtered_words.append(word)
+            else:
+                # print(f"Removing filler word: '{word}'")  # Diagnostic print
+                pass
+        
+        return ' '.join(filtered_words)
+
+    # Function to remove repetitive phrases (without regex)
+    def remove_repetitive_phrases(self, text):
+        words = text.split()  # Split sentence into words
+        # print(f"Words in sentence before removing repetition: {words}")  # Diagnostic print
+        
+        unique_words = []
+        prev_word = None
+        for word in words:
+            # Remove punctuation from the word for comparison
+            clean_word = re.sub(r'[^\w\s]', '', word)  # Remove non-alphanumeric characters
+            # print(f"Checking word: '{word}' (cleaned: '{clean_word}') with previous word: '{prev_word}'")  # Diagnostic print
+            
+            # Skip consecutive repetitions (e.g., "i i i" or "I, I, I")
+            if prev_word and clean_word.lower() == prev_word.lower():
+                continue
+            
+            unique_words.append(word)
+            prev_word = clean_word.lower()  # Store cleaned version for comparison
+        
+        # Reconstruct sentence without repetitions
+        cleaned_sentence = ' '.join(unique_words)
+        # print(f"Cleaned sentence: '{cleaned_sentence}'")  # Diagnostic print
+        return cleaned_sentence
+
+
 
     def process_transcription(self, transcription, word_timestamps):
-        """Process the transcription to generate summaries, highlight sentences, and format chunks."""
         # Clean transcription for summarization
-        cleaned_transcription = re.sub(r'\s+', ' ', transcription).strip()
+        cleaned_transcription, cleaned_word_timestamps= self.preprocess_transcription(transcription, word_timestamps)
 
         # Generate extractive summary from the cleaned transcription
-        critical_sentences = self._extract_summary(cleaned_transcription)
+        critical_sentences = self._extract_summary(cleaned_word_timestamps)
 
-        # Highlight critical sentences in the original transcription (not cleaned)
-        highlighted_transcription = self._highlight_critical_sentences(transcription, critical_sentences)
 
-        # Apply highlights to word timestamps
-        highlighted_word_timestamps = self._apply_highlighted_to_word_timestamps(word_timestamps, critical_sentences)
-
-        return {
-            "summary": critical_sentences,
-            "highlighted_transcription": highlighted_transcription,
-            "highlighted_word_timestamps": highlighted_word_timestamps,
-        }
+        return critical_sentences, cleaned_transcription, cleaned_word_timestamps
     
     def summarize_chunks(self, chunks):
         """
@@ -445,6 +518,7 @@ class HTMLSaver:
 
         self.logger.info(f"HTML report saved to: {html_filename}")
         print(f"HTML report saved to: {html_filename}")
+
 
     def _generate_html_filename(self, timestamp):
         """Generate the HTML file name based on the audio file and timestamp."""

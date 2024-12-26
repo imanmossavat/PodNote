@@ -1,3 +1,5 @@
+
+
 import os
 import sys
 import argparse
@@ -7,27 +9,30 @@ root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
 sys.path.append(root_dir)
 
 #sys.argv= ['script.py', r"YOURFILE"]
-sys.argv= ['script.py', r"C:\Users\imanm\OneDrive\Documents\podcast\dastani\retake\Promo\snippet_dastani_2_power_assymetry.wav"]
 
-#sys.argv= ['script.py', r"C:\Users\imanm\OneDrive\Documents\podcast\robert engels\processed_Robert_Iman Podcast-20241203_090154-final_v2.wav"]
 
 from src import Config, UIManager
 def main():
+    
+    filename_transcription_state = None
+
     # Step 1: Set up command-line argument parsing for the audio file
     parser = argparse.ArgumentParser(description="Transcribe a podcast audio file to markdown.")
     parser.add_argument('audio_file', type=str, help="Path to the audio file to transcribe.")
 
     args = parser.parse_args()
 
-
-
-
-
     # Step 2: Set up the configuration (Config) for the system
     config = Config()
-    
-    config.prompt['filler']=''
-    config.prompt['domain']='Iman Mossavat, \"Iman Mossavat\", \"Mehdi Dastani\", Fontys, Eindhoven, Capegemini'
+   
+
+    # Add special names or domain-specific terms to assist transcription
+    # Include:
+    # - Your name or any variations
+    # - Names of collaborators, companies, or institutions
+    # - City names or other domain-specific keywords
+    config.prompt['domain']='Iman Mossavat, \"Iman Mossavat\", Fontys, Eindhoven' 
+    config.prompt['filler']='' # we turn off the filler detection by setting it to be empty
 
     # Step 3: Initialize the UI Manager (handling user requests and managing interactions)
     ui_manager = UIManager(config)
@@ -42,9 +47,23 @@ def main():
     try:
         # Step 5: Process the audio through the UI manager
         ui_manager.process_audio()
-        ui_manager.transcribe()
-        ui_manager.save_raw_transcription()
-        ui_manager.report()
+        
+
+
+        if filename_transcription_state is not None and os.path.exists(filename_transcription_state):
+            # we skip transcription instead we load the file
+            ui_manager.load_transcription_state(filename_transcription_state)
+        else:
+            ui_manager.transcribe()
+            data_dir= config.directories['data_dir']
+            filename_transcription_state = os.path.join(data_dir, f"transcription_state.json")
+            ui_manager.save_transcription_state(filename_transcription_state)
+
+            print(f'transcription data saved in {filename_transcription_state}')
+            print('you can load the transcription file by ui_manager.load_transcription_state')
+            ui_manager.save_raw_transcription() # if you need the information in a text file.
+        
+        ui_manager.report() # makes the final HTML report
     
     except Exception as e:
         # Log any errors that occur during the process

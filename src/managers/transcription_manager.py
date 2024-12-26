@@ -4,6 +4,7 @@ import sys
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
 print(root_dir)
 sys.path.append(root_dir)
+import json
 
 import whisper
 
@@ -48,3 +49,25 @@ class TranscriptionManager:
         self.transcription = result['text']
         self.word_timestamps = result['segments']
 
+
+    def save_state(self, state_file):
+        """Save the state of the transcription to a file."""
+        state = {
+            "transcription": self.transcription,
+            "word_timestamps": self.word_timestamps,
+            "audio_file_name": self.audio_file_name,
+            "prompt": self.prompt,
+            "report_dir": self.report_dir,
+        }
+        with open(state_file, "w") as f:
+            json.dump(state, f)
+
+    def load_state(self, state_file):
+        """Load the state of the transcription from a file."""
+        with open(state_file, "r") as f:
+            state = json.load(f)
+        self.transcription = state["transcription"]
+        self.word_timestamps = state["word_timestamps"]
+        self.audio_file_name = state["audio_file_name"]
+        self.prompt = state["prompt"]
+        self.report_dir = state["report_dir"]
