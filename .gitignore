@@ -9,3 +9,4 @@ docs/issues.txt
 *.md
 *.txt
 data/default_job/**/*.json
+Myscript.py
