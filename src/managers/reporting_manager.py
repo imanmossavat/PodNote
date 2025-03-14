@@ -436,7 +436,7 @@ class ChunkFormatter:
             
     def merge_summaries(self, chunk_summaries, chunks, critical_sentences, Prompt=None):
         if Prompt is None:
-            Prompt = "Here are abstractive summaries for text chunks of a given length. From each chunk, certain critical sentences were chosen by the abstractive summary process run on the entire document. Use this information to create a summary organized in temporally coherent topics with time stamps:"
+            Prompt = "Episode Context: <Podcast name> <Guest name> <guest affiliation> <host name>. Instructions: Here are abstractive summaries for text chunks of a given length. From each chunk, certain critical sentences were chosen by the abstractive summary process run on the entire document. Use this information to create a summary. Do quote the guest. Write an engaging LinkedIn-style summary for a podcast episode. Start with the guest's name, title, affiliation, and the main topic of discussion. Highlight key points discussed in the episode, organized by themes or topics, and include quotes where impactful. Mention the guest's motivations, perspectives, and any broader implications of their work. Conclude with a call to action, noting that further details (e.g., links to the podcast or paper) are in the comments. Keep the tone professional but accessible, and aim for a concise format suitable for LinkedIn. Text:  "
 
         # Start by adding the prompt to the summary (optional)
         interleaved_summaries = [Prompt]

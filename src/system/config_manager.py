@@ -3,6 +3,10 @@ import os
 import sys
 import time
 
+logging.getLogger("transformers").setLevel(logging.ERROR)
+logging.getLogger("torch").setLevel(logging.ERROR)
+
+
 # Set root directory to 'src'
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
 sys.path.append(root_dir)

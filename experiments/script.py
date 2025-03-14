@@ -3,13 +3,19 @@
 import os
 import sys
 import argparse
+from pathlib import Path
+import warnings
+
+# Suppress FutureWarnings and UserWarnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
+
 
 # Set up the root directory
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
 sys.path.append(root_dir)
 
 #sys.argv= ['script.py', r"YOURFILE"]
-
 
 from src import Config, UIManager
 def main():
@@ -22,8 +28,10 @@ def main():
 
     args = parser.parse_args()
 
+    audio_file = args.audio_file
+    data_dir= Path(audio_file).parent
     # Step 2: Set up the configuration (Config) for the system
-    config = Config()
+    config = Config(data_dir=data_dir)
    
 
     # Add special names or domain-specific terms to assist transcription
@@ -38,7 +46,6 @@ def main():
     ui_manager = UIManager(config)
 
     # Step 4: Set the audio file from the command-line argument
-    audio_file = args.audio_file
     ui_manager.change_audio_file_name(audio_file)
 
     # Log the audio file processing start
