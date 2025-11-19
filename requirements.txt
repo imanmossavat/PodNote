@@ -2,7 +2,7 @@ torchaudio
 torch
 spacy
 whisper
-webbrowser
+# webbrowser # on Mac you do not need this
 sumy
 nltk
 transformers
